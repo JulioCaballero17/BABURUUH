@@ -31,7 +31,7 @@ export default function Intro() {
               Pulso de <em>Barcelona</em>
             </motion.h1>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.8 } }}>
-              Cómo se mueve la ciudad durante la semana laboral: de dónde sale la gente, adónde va a cada hora y qué barrios funcionan como burbujas.
+              Cómo se mueve la ciudad durante la semana laboral: de dónde sale la gente, adónde va cada día y qué barrios funcionan como burbujas.
             </motion.p>
             <motion.div className="intro-cta" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: 1 } }}>
               <button className="go" onClick={startIntro} autoFocus>
@@ -41,8 +41,8 @@ export default function Intro() {
             </motion.div>
             <motion.div className="intro-stats" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 1.25 } }}>
               <div><b>73</b><span>barrios</span></div>
-              <div><b>120</b><span>horas, de lunes a viernes</span></div>
-              <div><b>{fmtK(total)}</b><span>desplazamientos {ds.source.kind === 'simulado' ? 'simulados' : 'importados'}</span></div>
+              <div><b>5</b><span>días, de lunes a viernes</span></div>
+              <div><b>{fmtK(total)}</b><span>{ds.source.kind === 'real' ? `viajes entre barrios en una semana media · ${ds.source.period.toLowerCase()}` : ds.source.kind === 'simulado' ? 'viajes simulados' : 'viajes importados'}</span></div>
             </motion.div>
           </div>
         </motion.section>

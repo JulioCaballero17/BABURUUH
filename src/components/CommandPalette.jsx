@@ -10,8 +10,6 @@ function actions() {
   const s = useStore.getState()
   return [
     ...DAYS.map((d, k) => ({ id: `day${k}`, group: 'Ir a', icon: CalendarDays, label: `${d.name}`, hint: `${k + 1}`, run: () => s.goDay(k) })),
-    { id: 'm8', group: 'Ir a', icon: CalendarDays, label: 'Lunes 8:00 · hora punta', run: () => s.goTo(8) },
-    { id: 'v23', group: 'Ir a', icon: CalendarDays, label: 'Viernes 23:00 · noche', run: () => s.goTo(4 * 24 + 23) },
     { id: 'play', group: 'Acciones', icon: Play, label: 'Reproducir la semana', hint: 'Espacio', run: () => { if (!useStore.getState().playing) s.togglePlay() } },
     { id: 'story', group: 'Acciones', icon: BookOpen, label: 'Empezar el recorrido guiado', run: () => s.setStory({ active: true, idx: 0 }) },
     { id: 'delta', group: 'Acciones', icon: Triangle, label: 'Comparar con el lunes', run: () => { s.setDeltaBase(0); s.setColorMode('delta') } },
@@ -20,7 +18,8 @@ function actions() {
     { id: 'hex', group: 'Acciones', icon: Hexagon, label: 'Activar o quitar la colmena 3D', run: () => s.setLayer('hex', !useStore.getState().layers.hex) },
     { id: 'orbit', group: 'Acciones', icon: Orbit, label: 'Órbita automática', hint: 'O', run: () => s.setOrbit(!useStore.getState().orbit) },
     { id: 'layers', group: 'Paneles', icon: Layers, label: 'Abrir capas', run: () => s.openPanel('capas') },
-    { id: 'data', group: 'Paneles', icon: Database, label: 'Importar datos reales', run: () => s.openPanel('datos') },
+    { id: 'data', group: 'Paneles', icon: Database, label: 'Datos: periodo y tipo de viajero', run: () => s.openPanel('datos') },
+    ...useStore.getState().periods.filter((p) => p.kind !== 'month').map((p) => ({ id: `per-${p.id}`, group: 'Periodo', icon: CalendarDays, label: `Periodo: ${p.label}`, run: () => s.setPeriod(p.id) })),
     { id: 'shot', group: 'Acciones', icon: Camera, label: 'Descargar captura del mapa', hint: 'P', run: () => document.querySelector('[aria-label="Descargar captura del mapa"]')?.click() },
     ...Object.entries(PRESETS).map(([k, p]) => ({ id: `cam-${k}`, group: 'Cámara', icon: Video, label: `Cámara: ${p.label}`, run: () => flyPreset(k) })),
   ]

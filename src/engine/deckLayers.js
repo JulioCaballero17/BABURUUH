@@ -1,9 +1,9 @@
 import { TripsLayer } from '@deck.gl/geo-layers'
 import { ArcLayer, ScatterplotLayer, LineLayer } from '@deck.gl/layers'
 import { BARRIOS, N, DM } from '../model/geo.js'
-import { HOURS } from '../model/simulate.js'
+import { STEPS } from '../model/simulate.js'
 import { DAYS, hexToRgb, mix } from '../lib/colors.js'
-import { lerpArr, topFrom, topTo } from '../model/derive.js'
+import { lerpArr, topFrom, topTo, stepOf } from '../model/derive.js'
 
 const DAY_RGB = DAYS.map((d) => hexToRgb(d.hue))
 const CHAMPAGNE = hexToRgb('#F1E3C2')
@@ -11,23 +11,24 @@ const CHAMPAGNE = hexToRgb('#F1E3C2')
 let seed = 9157
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
 
-// Animated "comets" between barrios: the strongest flows of every hour of the week.
+// Animated "comets" between barrios: the strongest flows of every day of the week.
+// Each day owns a 60-unit slot of animation time; the layer loops inside the current day's slot.
 export function buildTrips(ds, elev) {
   seed = 9157
   const trips = []
-  for (let t = 0; t < HOURS; t++) {
+  for (let t = 0; t < STEPS; t++) {
     const Ft = ds.F[t]
     const list = []
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (i !== j && Ft[i * N + j] > 0) list.push([Ft[i * N + j], i, j])
     if (!list.length) continue
     list.sort((a, b) => b[0] - a[0])
-    const top = list.slice(0, 38)
+    const top = list.slice(0, 60)
     const vmax = top[0][0]
-    const color = DAY_RGB[Math.floor(t / 24)]
+    const color = DAY_RGB[t]
     for (const [v, i, j] of top) {
       const n = 1 + Math.round((2.6 * v) / vmax)
       for (let m = 0; m < n; m++) {
-        const start = t * 60 + rnd() * 60
+        const start = t * 60 + rnd() * 52
         const dk = DM[i * N + j]
         const dur = 9 + dk * 3.4
         const side = (rnd() < 0.5 ? -1 : 1) * (0.18 + 0.22 * rnd())
@@ -57,11 +58,11 @@ export function buildDeckLayers({ s, trips, elev, now, zoom, grow }) {
   const out = []
   if (s.intro !== 'done') return out
   const { t, layers, dataset: ds, sel, colorMode, influenceDir } = s
-  const day = Math.floor(t / 24)
+  const day = stepOf(t)
   const tod = (now / 1000) % 1000
 
   if (layers.flows && trips) {
-    const currentTime = s.playing || s.tween ? t * 60 : Math.floor(t) * 60 + ((tod * 11) % 60)
+    const currentTime = day * 60 + ((tod * 9) % 60)
     out.push(new TripsLayer({
       id: 'trips',
       data: trips,
@@ -95,7 +96,7 @@ export function buildDeckLayers({ s, trips, elev, now, zoom, grow }) {
       getWidth: (o) => 1.5 + 7 * Math.sqrt(o.v / vmax) * grow,
       getHeight: 0.5,
       widthUnits: 'pixels',
-      updateTriggers: { getWidth: [Math.round(t * 4), grow], getSourcePosition: [sel, incoming], getTargetPosition: [sel, incoming], getSourceColor: [day, incoming], getTargetColor: [day, incoming] },
+      updateTriggers: { getWidth: [day, grow], getSourcePosition: [sel, incoming], getTargetPosition: [sel, incoming], getSourceColor: [day, incoming], getTargetColor: [day, incoming] },
       transitions: { getWidth: 300 },
     }))
   }

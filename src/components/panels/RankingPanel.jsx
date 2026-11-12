@@ -9,27 +9,22 @@ import { fmtK, pct } from '../../lib/format.js'
 import { dayOf } from '../../lib/week.js'
 import { selectBarrio } from '../../engine/mapEngine.js'
 
-const valueAt = (A, t, i) => {
-  const t0 = Math.floor(t) % 120
-  const t1 = (t0 + 1) % 120
-  const f = t - Math.floor(t)
-  return A[t0][i] * (1 - f) + A[t1][i] * f
-}
+const valueAt = (A, d, i) => A[d][i]
 
 export default function RankingPanel() {
   const ds = useStore((s) => s.dataset)
-  const tq = useStore((s) => Math.floor(s.t * 4) / 4)
+  const tq = useStore((s) => dayOf(s.t))
   const sel = useStore((s) => s.sel)
   const [metric, setMetric] = useState('arr')
 
   const rows = useMemo(() => {
     const day = dayOf(tq)
-    const prevT = Math.max(0, tq - 1)
+    const prevT = (tq + 4) % 5
     const val = (i, t) => {
       if (metric === 'arr') return valueAt(ds.ARR, t, i)
       if (metric === 'dep') return valueAt(ds.DEP, t, i)
       if (metric === 'net') return valueAt(ds.ARR, t, i) - valueAt(ds.DEP, t, i)
-      return ds.metrics[i].bub[dayOf(t)]
+      return ds.metrics[i].bub[t]
     }
     const all = Array.from({ length: N }, (_, i) => ({ i, v: val(i, tq), p: val(i, prevT) }))
     all.sort((a, b) => b.v - a.v)
@@ -45,10 +40,10 @@ export default function RankingPanel() {
     <>
       <Segmented id="rank" label="Métrica" value={metric} onChange={setMetric} options={[{ value: 'arr', label: 'Llegan' }, { value: 'dep', label: 'Salen' }, { value: 'net', label: 'Saldo' }, { value: 'bub', label: 'Burbuja' }]} />
       <p className="note" style={{ marginTop: -10 }}>
-        {metric === 'arr' && 'Personas que llegan al barrio en la hora seleccionada.'}
-        {metric === 'dep' && 'Personas que salen del barrio en la hora seleccionada.'}
+        {metric === 'arr' && 'Viajes que llegan al barrio el día seleccionado.'}
+        {metric === 'dep' && 'Viajes que salen del barrio el día seleccionado.'}
         {metric === 'net' && 'Llegadas menos salidas: quién se llena y quién se vacía.'}
-        {metric === 'bub' && 'Parte de los viajes de 20 a 24 h que se quedan dentro del barrio, para este día.'}
+        {metric === 'bub' && 'Parte de los viajes que empiezan en el barrio y acaban dentro de él, ese día.'}
       </p>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
         {rows.top.map((o, k) => (
@@ -76,7 +71,7 @@ export default function RankingPanel() {
           </motion.li>
         ))}
       </ol>
-      <p className="note">Las flechas indican cuántos puestos ha ganado o perdido respecto a una hora antes.</p>
+      <p className="note">Las flechas indican cuántos puestos ha ganado o perdido respecto al día anterior (el lunes se compara con el viernes).</p>
     </>
   )
 }

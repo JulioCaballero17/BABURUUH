@@ -1,24 +1,31 @@
 import { create } from 'zustand'
 import { BARRIOS } from './model/geo.js'
-import { simulateWeek } from './model/simulate.js'
+import { simulateWeek, STEPS } from './model/simulate.js'
 import { deriveDataset } from './model/derive.js'
+import { loadIndex, loadPeriod, cubeFor, segmentLabel } from './model/realData.js'
 
 export const BASE_ATTRS = { pop: BARRIOS.map((b) => b.pop), rest: BARRIOS.map((b) => b.rest) }
 const SIM_F = simulateWeek()
 export const SIMULATED = deriveDataset(SIM_F, BASE_ATTRS)
 
 let toastId = 0
+let loadSeq = 0
 
 export const useStore = create((set, get) => ({
   // ---------- data ----------
   dataset: SIMULATED,
   attrs: BASE_ATTRS,
   importReport: null,
+  // real data (preprocessed files in public/data/movilidad)
+  periods: [], // [{id,label,kind,nDays}]
+  period: 'all',
+  segment: 'all', // 'all' | 'Residente' | 'Regional' | 'Nacional' | 'Internacional'
+  dataState: 'loading', // loading | ok | error | csv
 
-  // ---------- time ----------
-  t: 9,
+  // ---------- time (in days: 0 = Monday … 4 = Friday; fractional only while animating) ----------
+  t: 0,
   playing: false,
-  speed: 1.5, // simulated hours per second
+  speed: 0.5, // days per second
   loop: true,
   tween: null, // {from,to,start,dur}
 
@@ -55,18 +62,15 @@ export const useStore = create((set, get) => ({
   bicingState: 'idle',
 
   // ---------- actions ----------
-  setT: (t) => set({ t: ((t % 120) + 120) % 120, tween: null }),
+  setT: (t) => set({ t: ((t % STEPS) + STEPS) % STEPS, tween: null }),
   goTo: (to, dur = 900) => {
     const from = get().t
-    set({ tween: { from, to: Math.max(0, Math.min(119.99, to)), start: performance.now(), dur }, playing: false })
+    set({ tween: { from, to: Math.max(0, Math.min(STEPS - 1, to)), start: performance.now(), dur }, playing: false })
   },
-  goDay: (d) => {
-    const h = get().t % 24
-    get().goTo(d * 24 + h, 1100)
-  },
-  stepHour: (k) => {
-    const t = get().t
-    get().goTo(k > 0 ? Math.floor(t) + k : Math.ceil(t) + k, 350)
+  goDay: (d) => get().goTo(d, 900),
+  stepDay: (k) => {
+    const t = Math.round(get().t)
+    get().goTo(((t + k) % STEPS + STEPS) % STEPS, 600)
   },
   togglePlay: () => set((s) => ({ playing: !s.playing, tween: null })),
   setSpeed: (speed) => set({ speed }),
@@ -92,8 +96,37 @@ export const useStore = create((set, get) => ({
   setCompareB: (compareB) => set({ compareB }),
   setHoverStudy: (hoverStudy) => set({ hoverStudy }),
   setStory: (story) => set({ story }),
-  loadDataset: (dataset, report, attrs) => set({ dataset, importReport: report, ...(attrs ? { attrs } : {}) }),
-  resetDataset: () => set({ dataset: SIMULATED, importReport: null, attrs: BASE_ATTRS }),
+  loadDataset: (dataset, report, attrs) => set({ dataset, importReport: report, ...(attrs ? { attrs } : {}), ...(report?.kind === 'flows' ? { dataState: 'csv' } : {}) }),
+  resetDataset: () => { set({ importReport: null, attrs: BASE_ATTRS }); get().loadReal() },
+
+  // Load one period / traveller type of the real data. Falls back to the simulated data if the files are missing.
+  loadReal: async (period = get().period, segment = get().segment) => {
+    const seq = ++loadSeq
+    set({ period, segment, dataState: 'loading' })
+    try {
+      const idx = await loadIndex()
+      if (seq !== loadSeq) return
+      set({ periods: idx.periods })
+      if (!idx.periods.some((p) => p.id === period)) period = idx.periods[0].id
+      const p = await loadPeriod(period)
+      if (seq !== loadSeq) return
+      const ds = deriveDataset(cubeFor(p, segment), get().attrs, {
+        kind: 'real',
+        label: `${p.label} · ${segmentLabel(segment)}`,
+        period: p.label,
+        segment,
+        nDays: p.nDays,
+      })
+      set({ dataset: ds, period, segment, dataState: 'ok' })
+    } catch (e) {
+      if (seq !== loadSeq) return
+      console.warn('No se pudieron cargar los datos reales:', e)
+      set({ dataset: SIMULATED, dataState: 'error' })
+      get().toast('No encuentro los datos reales (public/data/movilidad). Se muestran datos simulados.', 'info')
+    }
+  },
+  setPeriod: (period) => get().loadReal(period, get().segment),
+  setSegment: (segment) => get().loadReal(get().period, segment),
 
   toast: (text, kind = 'ok') => {
     const id = ++toastId
@@ -102,5 +135,5 @@ export const useStore = create((set, get) => ({
   },
 }))
 
-// Effective UI theme (light glass by day, dark glass by night unless pinned)
-export const selectDark = (s) => (s.theme === 'auto' ? s.nightness > 0.5 : s.theme === 'dark')
+// Effective UI theme. The data has no hours, so there is no day/night cycle: 'auto' means light.
+export const selectDark = (s) => s.theme === 'dark'

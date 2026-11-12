@@ -28,10 +28,14 @@ if (HASH) {
     ...(HASH.sel != null ? { sel: HASH.sel } : {}),
     ...(HASH.colorMode ? { colorMode: HASH.colorMode } : {}),
     ...(HASH.deltaBase != null ? { deltaBase: HASH.deltaBase } : {}),
+    ...(HASH.period ? { period: HASH.period } : {}),
+    ...(HASH.segment ? { segment: HASH.segment } : {}),
     layers: { ...s.layers, ...(HASH.layers || {}), ...(HASH.barrios ? { barrios: HASH.barrios } : {}) },
   })
 }
 if (window.innerWidth < 760) useStore.setState({ panel: null })
+// Load the real data (preprocessed per period) as soon as the app starts.
+useStore.getState().loadReal()
 
 export default function App() {
   const dark = useStore(selectDark)
