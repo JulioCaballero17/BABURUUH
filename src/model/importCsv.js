@@ -73,6 +73,7 @@ export function readFile(file) {
       header: true,
       skipEmptyLines: 'greedy',
       dynamicTyping: false,
+      transformHeader: (h) => h.replace(/^﻿/, '').trim(),
       complete: (res) => resolve(res),
       error: reject,
     })
@@ -87,58 +88,164 @@ export function detectKind(headers) {
   return 'unknown'
 }
 
-export function buildFlows(rows, headers) {
-  const cols = detect(headers, ALIASES)
-  const report = { rows: rows.length, used: 0, weekend: 0, invalid: 0, unmatched: new Map(), columns: cols, days: new Set(), dates: new Map() }
-  if (!cols.origin || !cols.dest) {
-    report.error = 'No encuentro las columnas de origen y destino. Llámalas, por ejemplo, «origen» y «destino».'
-    return { report }
+// Columns that hold the traveller type in the raw files (Residente, Regional, …). In the raw
+// monthly files «origen» is that column; it is only used when it is not the barrio column.
+const SEG_ALIASES = ['tipo viajero', 'tipo de viajero', 'segmento', 'segment', 'origen']
+const MAX_SEGMENTS = 12
+
+// date / day string → weekday, cached (the raw files repeat the same few dates thousands of times)
+function dayParser(oneBased) {
+  const cache = new Map()
+  return (v) => {
+    const k = String(v ?? '')
+    let r = cache.get(k)
+    if (r) return r
+    const iso = /^\s*(\d{4})-(\d{2})-(\d{2})(?:$|[ T])/.exec(k)
+    if (iso) {
+      // plain calendar date: compute the weekday in UTC so the browser's time zone can't shift it
+      const wd = new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3])).getUTCDay()
+      r = wd === 0 || wd === 6 ? { d: -2 } : { d: wd - 1, date: `${iso[1]}-${iso[2]}-${iso[3]}` }
+    } else r = parseDay(v, oneBased)
+    cache.set(k, r)
+    return r
   }
-  // decide whether numeric days are 0- or 1-based
-  let oneBased = true
-  if (cols.day) {
-    const nums = rows.slice(0, 2000).map((r) => Number(r[cols.day])).filter((n) => Number.isInteger(n))
-    if (nums.includes(0)) oneBased = false
-  }
-  const F = Array.from({ length: STEPS }, () => new Float32Array(N * N))
+}
+
+// Streams a flows CSV (any size) and builds a «period» with the same shape as the preprocessed
+// JSON files (public/data/movilidad/*.json): { id, label, n, nDays, segments, seg: {name: [5 × N*N]} }.
+// Each weekday is averaged over the distinct dates it appears on, as scripts/preprocess-mobility.mjs does.
+export function importFlows(file, { onProgress } = {}) {
+  const report = { rows: 0, used: 0, weekend: 0, invalid: 0, unmatched: new Map(), columns: null, days: new Set(), weeksAveraged: 0, segments: [] }
+  const sums = new Map() // segment → [5 × Float64Array(N*N)]
+  const dates = Array.from({ length: STEPS }, () => new Set())
+  const undated = new Array(STEPS).fill(false)
   const cache = new Map()
   const match = (v) => { const k = String(v ?? ''); let i = cache.get(k); if (i == null) { i = matchBarrio(v); cache.set(k, i) } return i }
-  for (const r of rows) {
+  let cols = null
+  let segCol = null
+  let day = null
+  const size = file.size || (typeof file === 'string' ? file.length : 0)
+
+  const setup = (headers, rows) => {
+    cols = detect(headers, ALIASES)
+    report.columns = cols
+    if (!cols.origin || !cols.dest) return false
+    // traveller-type column: must not be the barrio column and must hold a handful of non-barrio labels
+    const segHit = headers.find((h) => SEG_ALIASES.includes(key(h)) && h !== cols.origin && h !== cols.dest)
+    if (segHit) {
+      const vals = new Set(rows.slice(0, 5000).map((r) => String(r[segHit] ?? '').trim()).filter(Boolean))
+      const barrioLike = [...vals].filter((v) => matchBarrio(v) >= 0).length
+      if (vals.size && vals.size <= MAX_SEGMENTS && barrioLike < vals.size / 2) segCol = segHit
+    }
+    report.columns = { ...cols, ...(segCol ? { segment: segCol } : {}) }
+    // decide whether numeric days are 0- or 1-based
+    let oneBased = true
+    if (cols.day) {
+      const nums = rows.slice(0, 2000).map((r) => String(r[cols.day] ?? '').trim()).filter((s) => /^\d+$/.test(s)).map(Number)
+      if (nums.includes(0)) oneBased = false
+    }
+    day = dayParser(oneBased)
+    return true
+  }
+
+  const add = (r) => {
+    report.rows++
     const o = match(r[cols.origin])
     const de = match(r[cols.dest])
     if (o < 0 || de < 0) {
       const bad = o < 0 ? r[cols.origin] : r[cols.dest]
       if (bad != null && String(bad).trim() !== '') report.unmatched.set(String(bad), (report.unmatched.get(String(bad)) || 0) + 1)
       else report.invalid++
-      continue
+      return
     }
     let d = 0
     let date = null
     if (cols.day) {
-      const pd = parseDay(r[cols.day], oneBased)
-      if (pd.d === -2) { report.weekend++; continue }
-      if (pd.d === -1) { report.invalid++; continue }
+      const pd = day(r[cols.day])
+      if (pd.d === -2) { report.weekend++; return }
+      if (pd.d === -1) { report.invalid++; return }
       d = pd.d
       date = pd.date || null
     }
     const n = cols.count ? parseCount(r[cols.count]) : 1
-    if (Number.isNaN(n)) { report.invalid++; continue }
-    F[d][o * N + de] += n
+    if (Number.isNaN(n)) { report.invalid++; return }
+    const seg = segCol ? String(r[segCol] ?? '').trim() || 'Sin tipo' : 'Todos'
+    let S = sums.get(seg)
+    if (!S) {
+      if (sums.size >= MAX_SEGMENTS) { report.invalid++; return }
+      S = Array.from({ length: STEPS }, () => new Float64Array(N * N))
+      sums.set(seg, S)
+    }
+    S[d][o * N + de] += n
     report.used++
     report.days.add(d)
-    if (date) {
-      if (!report.dates.has(d)) report.dates.set(d, new Set())
-      report.dates.get(d).add(date)
-    }
+    if (date) dates[d].add(date)
+    else undated[d] = true
   }
-  // several weeks in the file → average per weekday
-  for (const [d, set] of report.dates) {
-    const k = set.size
-    if (k > 1) { const A = F[d]; for (let x = 0; x < A.length; x++) A[x] /= k }
-  }
-  report.weeksAveraged = Math.max(0, ...[...report.dates.values()].map((s) => s.size))
-  if (!report.used) report.error = 'Ninguna fila se pudo usar. Revisa que los nombres de barrio coinciden con los oficiales o usa sus códigos (1–73 u 080190101).'
-  return { F, report }
+
+  return new Promise((resolve, reject) => {
+    let failed = false
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      dynamicTyping: false,
+      chunkSize: 4 * 1024 * 1024,
+      transformHeader: (h) => h.replace(/^﻿/, '').trim(),
+      chunk: (res, parser) => {
+        if (!cols && !setup(res.meta.fields || [], res.data)) {
+          failed = true
+          parser.abort()
+          return
+        }
+        for (const r of res.data) add(r)
+        if (onProgress && size) onProgress(Math.min(1, (res.meta.cursor || 0) / size))
+      },
+      complete: () => {
+        if (failed || !cols?.origin || !cols?.dest) {
+          report.error = 'No encuentro las columnas de origen y destino. Llámalas, por ejemplo, «origen» y «destino».'
+          return resolve({ report })
+        }
+        if (!report.used) {
+          report.error = 'Ninguna fila se pudo usar. Revisa que los nombres de barrio coinciden con los oficiales o usa sus códigos (1–73 u 080190101).'
+          return resolve({ report })
+        }
+        // days per weekday to average over: distinct dates, or 1 when the file only names the weekday
+        const nDays = dates.map((set, d) => set.size || (undated[d] ? 1 : 0))
+        report.weeksAveraged = Math.max(0, ...dates.map((s) => s.size))
+        const known = ['Residente', 'Regional', 'Nacional', 'Internacional']
+        const segments = [...sums.keys()].sort((a, b) => {
+          const ia = known.indexOf(a); const ib = known.indexOf(b)
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
+        })
+        report.segments = segCol ? segments : []
+        const seg = {}
+        for (const name of segments) {
+          seg[name] = sums.get(name).map((A, d) => {
+            const M = new Float32Array(N * N)
+            const k = nDays[d] || 1
+            for (let x = 0; x < M.length; x++) M[x] = A[x] / k
+            return M
+          })
+        }
+        const name = file.name || 'CSV'
+        resolve({ period: { id: 'csv', label: name, n: N, nDays, segments, seg }, report })
+      },
+      error: (e) => reject(e),
+    })
+  })
+}
+
+// Reads only the header row, to tell a flows file from an attributes file before parsing it all.
+export function readHeaders(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      preview: 1,
+      transformHeader: (h) => h.replace(/^﻿/, '').trim(),
+      complete: (res) => resolve(res.meta.fields || []),
+      error: reject,
+    })
+  })
 }
 
 export function buildAttributes(rows, headers, base) {

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileUp, Download, RotateCcw, Check, Info } from 'lucide-react'
 import { useStore } from '../../store.js'
-import { readFile, detectKind, buildFlows, buildAttributes, flowsToCsv, TEMPLATE_CSV, ATTR_TEMPLATE_CSV } from '../../model/importCsv.js'
+import { readFile, readHeaders, detectKind, importFlows, buildAttributes, flowsToCsv, TEMPLATE_CSV, ATTR_TEMPLATE_CSV } from '../../model/importCsv.js'
 import { deriveDataset } from '../../model/derive.js'
 import { BARRIOS } from '../../model/geo.js'
 import { DAYS } from '../../lib/colors.js'
@@ -10,7 +10,7 @@ import { fmt } from '../../lib/format.js'
 import { dayOf } from '../../lib/week.js'
 import { Segmented } from '../ui/primitives.jsx'
 import { PeriodSelect } from '../Dock.jsx'
-import { SEGMENTS } from '../../model/realData.js'
+import { SEGMENTS, segmentLabel } from '../../model/realData.js'
 
 const download = (name, text, type = 'text/csv;charset=utf-8') => {
   const blob = new Blob(['﻿' + text], { type })
@@ -26,6 +26,8 @@ export default function DataPanel() {
   const attrs = useStore((s) => s.attrs)
   const report = useStore((s) => s.importReport)
   const loadDataset = useStore((s) => s.loadDataset)
+  const loadCsv = useStore((s) => s.loadCsv)
+  const csv = useStore((s) => s.csv)
   const resetDataset = useStore((s) => s.resetDataset)
   const toast = useStore((s) => s.toast)
   const dataState = useStore((s) => s.dataState)
@@ -33,23 +35,24 @@ export default function DataPanel() {
   const setSegment = useStore((s) => s.setSegment)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState(0)
   const input = useRef(null)
 
   const handle = async (file) => {
-    if (!file) return
+    if (!file || busy) return
     setBusy(true)
+    setProgress(0)
     try {
-      const res = await readFile(file)
-      const headers = res.meta.fields || []
+      const headers = await readHeaders(file)
       const kind = detectKind(headers)
       if (kind === 'flows') {
-        const { F, report: rep } = buildFlows(res.data, headers)
+        const { period, report: rep } = await importFlows(file, { onProgress: setProgress })
         if (rep.error) { toast(rep.error, 'info'); useStore.setState({ importReport: { ...rep, file: file.name, kind } }); return }
-        const next = deriveDataset(F, attrs, { kind: 'csv', label: `Datos reales · ${file.name}` })
-        loadDataset(next, { ...rep, file: file.name, kind })
+        loadCsv(period, { ...rep, file: file.name, kind })
         toast(`Importadas ${fmt(rep.used)} filas. Todo el mapa se ha recalculado.`)
       } else if (kind === 'attributes') {
-        const { attrs: na, report: rep } = buildAttributes(res.data, headers, attrs)
+        const res = await readFile(file)
+        const { attrs: na, report: rep } = buildAttributes(res.data, res.meta.fields || [], attrs)
         const next = deriveDataset(ds.F, na, ds.source)
         loadDataset(next, { ...rep, file: file.name, kind }, na)
         toast(`Atributos actualizados para ${rep.used} barrios.`)
@@ -99,6 +102,14 @@ export default function DataPanel() {
         </section>
       )}
 
+      {dataState === 'csv' && csv?.segments.length > 1 && (
+        <section>
+          <div className="section-title"><h3>Tipo de viajero</h3><span>{csv.label}</span></div>
+          <Segmented id="segment-csv" label="Tipo de viajero" value={segment} onChange={setSegment} options={[{ value: 'all', label: 'Todos' }, ...csv.segments.map((v) => ({ value: v, label: SEGMENTS.find((s) => s.value === v)?.label || v }))]} />
+          <p className="note" style={{ marginTop: 8 }}>{segment === 'all' ? 'Todos los viajeros' : segmentLabel(segment)}.</p>
+        </section>
+      )}
+
       <section>
         <div
           className={`dropzone ${over ? 'over' : ''}`}
@@ -111,7 +122,7 @@ export default function DataPanel() {
           onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files?.[0]) }}
         >
           <FileUp />
-          <b>{busy ? 'Leyendo el archivo…' : 'Arrastra aquí tu CSV'}</b>
+          <b>{busy ? `Leyendo el archivo… ${Math.round(progress * 100)} %` : 'Arrastra aquí tu CSV'}</b>
           <small>Flujos (origen, destino, día, viajes) — también los ficheros mensuales originales — o atributos (barrio, población, restaurantes)</small>
           <input ref={input} type="file" accept=".csv,.txt,.tsv" hidden onChange={(e) => { handle(e.target.files?.[0]); e.target.value = '' }} />
         </div>
@@ -130,6 +141,7 @@ export default function DataPanel() {
                   {report.kind === 'flows' && (
                     <>
                       <span>Días con datos: {[...report.days].sort().map((d) => DAYS[d].short).join(', ') || '—'}</span>
+                      {report.segments?.length > 0 && <span>Tipos de viajero: {report.segments.join(', ')}.</span>}
                       {report.weeksAveraged > 1 && <span>Se han promediado hasta {report.weeksAveraged} fechas por día laborable.</span>}
                       {report.weekend > 0 && <span>{fmt(report.weekend)} filas de fin de semana no se usan.</span>}
                       {report.invalid > 0 && <span className="bad">{fmt(report.invalid)} filas con día, hora o cantidad no válidos.</span>}

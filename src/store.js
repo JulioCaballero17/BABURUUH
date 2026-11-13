@@ -97,7 +97,27 @@ export const useStore = create((set, get) => ({
   setHoverStudy: (hoverStudy) => set({ hoverStudy }),
   setStory: (story) => set({ story }),
   loadDataset: (dataset, report, attrs) => set({ dataset, importReport: report, ...(attrs ? { attrs } : {}), ...(report?.kind === 'flows' ? { dataState: 'csv' } : {}) }),
-  resetDataset: () => { set({ importReport: null, attrs: BASE_ATTRS }); get().loadReal() },
+  resetDataset: () => { set({ importReport: null, attrs: BASE_ATTRS, csv: null }); get().loadReal() },
+
+  // An uploaded flows CSV, kept with the same shape as a preprocessed period so the traveller-type selector still works.
+  csv: null,
+  loadCsv: (csv, report) => {
+    ++loadSeq // a real-data load still in flight must not overwrite the upload
+    set({ csv, importReport: report, dataState: 'csv' })
+    const seg = get().segment
+    get().applyCsv(seg === 'all' || csv.segments.includes(seg) ? seg : 'all')
+  },
+  applyCsv: (segment) => {
+    const csv = get().csv
+    if (!csv) return
+    const dataset = deriveDataset(cubeFor(csv, segment), get().attrs, {
+      kind: 'csv',
+      label: `Datos reales · ${csv.label}${segment !== 'all' ? ` · ${segmentLabel(segment)}` : ''}`,
+      segment,
+      nDays: csv.nDays,
+    })
+    set({ dataset, segment })
+  },
 
   // Load one period / traveller type of the real data. Falls back to the simulated data if the files are missing.
   loadReal: async (period = get().period, segment = get().segment) => {
@@ -126,7 +146,7 @@ export const useStore = create((set, get) => ({
     }
   },
   setPeriod: (period) => get().loadReal(period, get().segment),
-  setSegment: (segment) => get().loadReal(get().period, segment),
+  setSegment: (segment) => (get().dataState === 'csv' ? get().applyCsv(segment) : get().loadReal(get().period, segment)),
 
   toast: (text, kind = 'ok') => {
     const id = ++toastId
