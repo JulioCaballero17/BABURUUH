@@ -5,4 +5,3 @@ export const signedPct = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v 
 export const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v))
 export const smoothstep = (x) => { const t = clamp(x); return t * t * (3 - 2 * t) }
 export const easeInOutCubic = (e) => (e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2)
-export const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`

@@ -4,8 +4,8 @@ import { useStore } from '../store.js'
 
 const SHORTCUTS = [
   ['Espacio', 'Reproducir o pausar la semana'],
-  ['1 – 5', 'Ir de lunes a viernes (misma hora)'],
-  ['← →', 'Avanzar o retroceder una hora'],
+  ['1 – 5', 'Ir de lunes a viernes'],
+  ['← →', 'Día anterior / siguiente'],
   ['Ctrl K  ·  /', 'Buscar barrio o acción'],
   ['L B R G S I', 'Paneles: capas, burbujas, ranking, distritos, historias, datos'],
   ['D', 'Comparar con el lunes'],

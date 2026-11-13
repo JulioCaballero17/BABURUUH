@@ -1,4 +1,4 @@
-// Shareable state in the URL hash: day/time, selected barrio, colour mode, layers and camera.
+// Shareable state in the URL hash: day, period, traveller type, selected barrio, colour mode, layers and camera.
 const LAYER_KEYS = ['labels', 'terrain', 'buildings', 'hex', 'flows', 'arcs', 'bubbles', 'pulse', 'names', 'bicing']
 
 export function readHash() {
@@ -6,7 +6,9 @@ export function readHash() {
   if (!h) return null
   const p = new URLSearchParams(h)
   const out = {}
-  if (p.has('t')) { const t = Number(p.get('t')); if (Number.isFinite(t)) out.t = Math.max(0, Math.min(119.9, t)) }
+  if (p.has('d')) { const d = Number(p.get('d')); if (Number.isInteger(d) && d >= 0 && d <= 4) out.t = d }
+  if (p.has('p') && /^[\w-]{1,12}$/.test(p.get('p'))) out.period = p.get('p')
+  if (p.has('s') && ['all', 'Residente', 'Regional', 'Nacional', 'Internacional'].includes(p.get('s'))) out.segment = p.get('s')
   if (p.has('b')) { const b = Number(p.get('b')); if (Number.isInteger(b) && b >= 0 && b < 73) out.sel = b }
   if (p.has('m') && ['activity', 'delta', 'bubble', 'influence'].includes(p.get('m'))) out.colorMode = p.get('m')
   if (p.has('base')) out.deltaBase = Math.max(0, Math.min(4, Number(p.get('base')) || 0))
@@ -25,7 +27,8 @@ export function readHash() {
 
 export function writeHash(s, cam) {
   const p = new URLSearchParams()
-  p.set('t', s.t.toFixed(2))
+  p.set('d', String(Math.round(s.t) % 5))
+  if (s.dataState !== 'csv') { p.set('p', s.period); p.set('s', s.segment) }
   if (s.sel >= 0) p.set('b', String(s.sel))
   p.set('m', s.colorMode)
   if (s.colorMode === 'delta') p.set('base', String(s.deltaBase))

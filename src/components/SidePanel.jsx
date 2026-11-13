@@ -11,11 +11,11 @@ import DataPanel from './panels/DataPanel.jsx'
 
 const META = {
   capas: { eyebrow: 'Mapa', title: 'Capas y lectura', text: 'Qué se ve sobre el satélite y cómo se colorean los barrios.', C: LayersPanel },
-  estudio: { eyebrow: 'Estudio', title: 'La hipótesis de la burbuja', text: '¿Los barrios con más restaurantes retienen a su gente por la noche?', C: StudyPanel },
-  ranking: { eyebrow: 'En directo', title: 'Ranking de barrios', text: 'Quién recibe, quién vacía y quién se queda, hora a hora.', C: RankingPanel },
-  distritos: { eyebrow: 'Flujos', title: 'De distrito a distrito', text: 'Los 10 distritos y la gente que circula entre ellos a esta hora.', C: DistrictsPanel },
+  estudio: { eyebrow: 'Estudio', title: 'La hipótesis de la burbuja', text: '¿Los barrios con más restaurantes retienen a su gente?', C: StudyPanel },
+  ranking: { eyebrow: 'En directo', title: 'Ranking de barrios', text: 'Quién recibe, quién vacía y quién se queda, día a día.', C: RankingPanel },
+  distritos: { eyebrow: 'Flujos', title: 'De distrito a distrito', text: 'Los 10 distritos y los viajes entre ellos ese día.', C: DistrictsPanel },
   historias: { eyebrow: 'Narrativa', title: 'Historias de la semana', text: 'Recorridos guiados por lo más llamativo de los datos.', C: StoriesPanel },
-  datos: { eyebrow: 'Datos', title: 'Tus datos', text: 'Sustituye los datos simulados por los reales en segundos.', C: DataPanel },
+  datos: { eyebrow: 'Datos', title: 'Datos', text: 'Elige el periodo y el tipo de viajero, o importa tu propio CSV.', C: DataPanel },
 }
 
 export default function SidePanel() {

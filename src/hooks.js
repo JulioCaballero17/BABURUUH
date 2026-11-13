@@ -26,8 +26,8 @@ export function useShortcuts() {
       const onButton = e.target.closest?.('button, [role="slider"]')
       if (e.key === ' ' && !onButton) { e.preventDefault(); s.togglePlay(); return }
       if (/^[1-5]$/.test(e.key) && !s.story.active) { s.goDay(Number(e.key) - 1); return }
-      if (e.key === 'ArrowRight' && !onButton && !s.story.active) { e.preventDefault(); s.stepHour(1); return }
-      if (e.key === 'ArrowLeft' && !onButton && !s.story.active) { e.preventDefault(); s.stepHour(-1); return }
+      if (e.key === 'ArrowRight' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(1); return }
+      if (e.key === 'ArrowLeft' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(-1); return }
       if (e.key === '/') { e.preventDefault(); s.setCmdk(true); return }
       if (e.key === '?') { s.setHelp(true); return }
       const k = e.key.toLowerCase()
@@ -89,7 +89,7 @@ export function useHashSync() {
     }
     const unsub = useStore.subscribe((s, p) => {
       if (s.intro !== 'done') return
-      if (Math.floor(s.t * 4) !== Math.floor(p.t * 4) || s.sel !== p.sel || s.colorMode !== p.colorMode || s.layers !== p.layers || s.deltaBase !== p.deltaBase || s.intro !== p.intro) push()
+      if (Math.round(s.t) !== Math.round(p.t) || s.period !== p.period || s.segment !== p.segment || s.sel !== p.sel || s.colorMode !== p.colorMode || s.layers !== p.layers || s.deltaBase !== p.deltaBase || s.intro !== p.intro) push()
     })
     const attach = () => { const m = getMap(); if (m) m.on('moveend', push); else setTimeout(attach, 300) }
     attach()

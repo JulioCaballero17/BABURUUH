@@ -1,52 +1,78 @@
 import { motion } from 'framer-motion'
-import { Play, Pause, Sunrise, Sunset, Moon } from 'lucide-react'
+import { Play, Pause } from 'lucide-react'
 import { useStore } from '../store.js'
 import Timeline from './Timeline.jsx'
 import { AnimatedNumber } from './ui/primitives.jsx'
-import { dayName, dayDate, clockText, sunTimes, sunAt } from '../lib/week.js'
+import { dayName, dayOf } from '../lib/week.js'
 import { fmtK, pct } from '../lib/format.js'
+import { segmentLabel } from '../model/realData.js'
 
-const SPEEDS = [{ v: 0.5, l: '½×' }, { v: 1.5, l: '1×' }, { v: 5, l: '4×' }]
-const hm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`
+const SPEEDS = [{ v: 0.25, l: '½×' }, { v: 0.5, l: '1×' }, { v: 1.2, l: '2×' }]
 
-function Clock() {
-  const t5 = useStore((s) => Math.floor(s.t * 12) / 12)
-  const d = Math.floor(t5 / 24)
-  const sun = sunAt(t5)
-  const st = sunTimes(d)
-  const h = t5 % 24
-  const meta = sun.nightness > 0.5
-    ? (h < 12 ? { I: Sunrise, txt: `Amanece a las ${hm(st.sunrise)}` } : { I: Moon, txt: `Noche · puesta a las ${hm(st.sunset)}` })
-    : { I: Sunset, txt: `Puesta de sol a las ${hm(st.sunset)}` }
+export function PeriodSelect({ className = 'period-select', id = 'period' }) {
+  const periods = useStore((s) => s.periods)
+  const period = useStore((s) => s.period)
+  const setPeriod = useStore((s) => s.setPeriod)
+  const dataState = useStore((s) => s.dataState)
+  if (!periods.length || dataState === 'csv') return null
+  const groups = [
+    ['Resumen', periods.filter((p) => p.kind !== 'month')],
+    ...[...new Set(periods.filter((p) => p.kind === 'month').map((p) => p.id.slice(0, 4)))].map((y) => [y, periods.filter((p) => p.kind === 'month' && p.id.startsWith(y))]),
+  ]
   return (
-    <div className="clock" aria-live="off">
-      <div className="day">{dayName(t5)} {dayDate(d)}</div>
-      <div className="time">{clockText(t5)}</div>
-      <div className="meta"><meta.I /> {meta.txt}</div>
-    </div>
+    <>
+      <label className="sr-only" htmlFor={id}>Periodo de los datos</label>
+      <select id={id} className={className} value={period} onChange={(e) => setPeriod(e.target.value)} title="Periodo: media de cada día laborable">
+        {groups.map(([g, list]) => (
+          <optgroup key={g} label={g}>
+            {list.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </optgroup>
+        ))}
+      </select>
+    </>
   )
 }
 
-function Kpis() {
-  const tq = useStore((s) => Math.floor(s.t * 8) / 8)
+function Clock() {
+  const t = useStore((s) => Math.round(s.t))
   const ds = useStore((s) => s.dataset)
-  const t0 = Math.floor(tq) % 120
-  const t1 = (t0 + 1) % 120
-  const f = tq - Math.floor(tq)
-  const moving = ds.MOV[t0] * (1 - f) + ds.MOV[t1] * f
+  const dataState = useStore((s) => s.dataState)
+  const segment = useStore((s) => s.segment)
+  const d = dayOf(t)
+  const n = ds.source.nDays?.[d]
+  return (
+    <div className="clock" aria-live="off">
+      <div className="day">{dayName(t)}</div>
+      <PeriodSelect />
+      <div className="meta">
+        {dataState === 'loading' && <><span className="loading-dot" /> Cargando datos…</>}
+        {dataState === 'ok' && <>{n ? `Media de ${n} ${DAYS_PL[d]}` : ''}{segment !== 'all' ? ` · ${segmentLabel(segment)}` : ''}</>}
+        {dataState === 'error' && 'Datos simulados'}
+        {dataState === 'csv' && ds.source.label}
+      </div>
+    </div>
+  )
+}
+const DAYS_PL = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']
+
+function Kpis() {
+  const d = useStore((s) => dayOf(s.t))
+  const ds = useStore((s) => s.dataset)
   let st = 0
   let dep = 0
-  for (let i = 0; i < 73; i++) { st += ds.STAY[t0][i]; dep += ds.DEP[t0][i] }
+  for (let i = 0; i < 73; i++) { st += ds.STAY[d][i]; dep += ds.DEP[d][i] }
   return (
     <>
       <div className="mini-kpi">
-        <AnimatedNumber className="v" value={moving} format={fmtK} />
-        <span className="l">personas cambiando de barrio por hora</span>
+        <AnimatedNumber className="v" value={ds.MOV[d]} format={fmtK} />
+        <span className="l">viajes entre barrios ese día</span>
       </div>
-      <div className="mini-kpi extra">
-        <AnimatedNumber className="v" value={dep ? st / dep : 0} format={(v) => pct(v)} />
-        <span className="l">de los viajes no salen del barrio</span>
-      </div>
+      {ds.hasStays && (
+        <div className="mini-kpi extra">
+          <AnimatedNumber className="v" value={dep ? st / dep : 0} format={(v) => pct(v)} />
+          <span className="l">de los viajes no salen del barrio</span>
+        </div>
+      )}
     </>
   )
 }

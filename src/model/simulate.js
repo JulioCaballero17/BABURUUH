@@ -1,10 +1,13 @@
-// Gravity model that generates a plausible Monday–Friday origin→destination dataset
-// (5 days × 24 hours × 73 × 73). It exists so the app is explorable before the real
-// data arrives; the Datos panel replaces it with an imported CSV.
+// Gravity model that generates a plausible Monday–Friday origin→destination dataset.
+// It is generated hour by hour (5 × 24 × 73 × 73) and then summed per day, because the
+// app works with DAILY totals (the real data has no hours). It is only a fallback for when
+// the real data files in public/data/movilidad are missing.
 import { BARRIOS, N, DM, hash } from './geo.js'
 import { MATCH_BARRIO, OFFICE_22 } from '../data/attributes.js'
 
-export const HOURS = 120
+const HOURS = 120
+// The app's time axis: one step per weekday (Monday … Friday).
+export const STEPS = 5
 
 const WF = [1, 1.03, 1.02, 0.99, 0.86] // work volume (Friday: remote work)
 const LF = [0.55, 0.6, 0.68, 0.85, 1.1] // evening leisure volume
@@ -93,5 +96,10 @@ export function simulateWeek() {
       }
     }
   }
-  return F
+  // daily totals
+  return Array.from({ length: STEPS }, (_, d) => {
+    const D = new Float32Array(N * N)
+    for (let h = 0; h < 24; h++) { const Fh = F[d * 24 + h]; for (let k = 0; k < D.length; k++) D[k] += Fh[k] }
+    return D
+  })
 }

@@ -163,6 +163,12 @@ export function matchBarrio(value) {
   if (value == null || value === '') return -1
   const n = Number(value)
   if (Number.isInteger(n) && n >= 1 && n <= N && String(value).trim().match(/^\d+$/)) return n - 1
+  // official 9-digit code: 08019 + district (2) + barrio within the district (2), e.g. 080190101
+  const m = String(value).trim().match(/^0?8019(\d{2})(\d{2})$/)
+  if (m) {
+    const inDist = BARRIOS.filter((b) => b.dist === Number(m[1]))
+    if (inDist[Number(m[2]) - 1]) return inDist[Number(m[2]) - 1].i
+  }
   const key = normalizeName(value)
   if (NAME_INDEX.has(key)) return NAME_INDEX.get(key)
   // loose match: every word of the shorter name appears in the longer one

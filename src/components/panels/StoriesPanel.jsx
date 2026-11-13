@@ -25,7 +25,7 @@ export default function StoriesPanel() {
             <motion.li key={c.id} {...stagger(k)}>
               <button className="row" style={{ width: '100%' }} onClick={() => setStory({ active: true, idx: k })}>
                 <span className="num" style={{ width: 22, color: 'var(--ink-3)', fontSize: 12 }}>{String(k + 1).padStart(2, '0')}</span>
-                <span className="txt"><b>{c.title}</b><small>{DAYS[Math.floor(c.t / 24)].name}</small></span>
+                <span className="txt"><b>{c.title}</b><small>{DAYS[c.t].name}</small></span>
               </button>
             </motion.li>
           ))}
