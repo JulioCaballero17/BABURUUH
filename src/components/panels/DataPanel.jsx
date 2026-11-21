@@ -9,7 +9,7 @@ import { DAYS } from '../../lib/colors.js'
 import { fmt } from '../../lib/format.js'
 import { dayOf } from '../../lib/week.js'
 import { Segmented } from '../ui/primitives.jsx'
-import { PeriodSelect } from '../Dock.jsx'
+import { PeriodSelect, SegmentSelect } from '../Dock.jsx'
 import { SEGMENTS, segmentLabel } from '../../model/realData.js'
 
 const download = (name, text, type = 'text/csv;charset=utf-8') => {
@@ -83,7 +83,7 @@ export default function DataPanel() {
       <section>
         <div className="report" style={{ gridTemplateColumns: 'auto 1fr', alignItems: 'center', columnGap: 10 }}>
           <span className="dot live" />
-          <span><b>{ds.source.label}</b><br /><span style={{ color: 'var(--ink-3)' }}>{
+          <span><b>{ds.source.kind === 'real' ? `Datos de movilidad de Telefónica · ${ds.source.label}` : ds.source.label}</b><br /><span style={{ color: 'var(--ink-3)' }}>{
             dataState === 'loading' ? 'Cargando…'
               : ds.source.kind === 'simulado' ? 'Modelo de gravedad (no se encontraron los datos reales).'
                 : ds.source.kind === 'real' ? `Media de cada día laborable: ${ds.source.nDays.map((n, k) => `${n} ${DAYS[k].short.toLowerCase()}`).join(', ')}.`
@@ -95,10 +95,10 @@ export default function DataPanel() {
       {dataState !== 'csv' && dataState !== 'error' && (
         <section>
           <div className="section-title"><h3>Periodo</h3><span>media de lunes a viernes</span></div>
-          <div className="clock" style={{ minWidth: 0 }}><PeriodSelect id="period-panel" /></div>
+          <PeriodSelect id="period-panel" />
           <div className="section-title" style={{ marginTop: 16 }}><h3>Tipo de viajero</h3></div>
-          <Segmented id="segment" label="Tipo de viajero" value={segment} onChange={setSegment} options={SEGMENTS.map((s) => ({ value: s.value, label: s.label }))} />
-          <p className="note" style={{ marginTop: 8 }}>{SEGMENTS.find((s) => s.value === segment)?.long}. Para estudiar la burbuja de los vecinos, usa «Residentes».</p>
+          <SegmentSelect id="segment-panel" />
+          <p className="note" style={{ marginTop: 8 }}>{SEGMENTS.find((s) => s.value === segment)?.long}. «Residentes» son quienes viven en Barcelona; el resto son visitantes de Cataluña, de España o del extranjero.</p>
         </section>
       )}
 

@@ -52,3 +52,41 @@ export function cubeFor(period, segment = 'all') {
     return M
   })
 }
+
+// Arrivals per weekday and barrio for each traveller type (used by the residents-vs-visitors view).
+export function segmentArrivals(period) {
+  const out = {}
+  for (const name of period.segments) {
+    out[name] = Array.from({ length: STEPS }, (_, d) => {
+      const a = new Float32Array(N)
+      const src = period.seg[name]?.[d]
+      if (src) for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) a[j] += src[i * N + j]
+      return a
+    })
+  }
+  return out
+}
+
+// Light summary of every period (average weekday arrivals/departures per barrio and traveller type),
+// produced by scripts/build-summary.mjs. Used for the monthly evolution and the period comparison.
+let summaryPromise = null
+export function loadSummary() {
+  summaryPromise ||= fetch(`${BASE}summary.json`).then((r) => {
+    if (!r.ok) throw new Error(`summary.json: ${r.status}`)
+    return r.json()
+  }).catch((e) => { summaryPromise = null; throw e })
+  return summaryPromise
+}
+
+// Average weekday arrivals per barrio for one period and traveller type ('all' sums them).
+export function summaryArrivals(summary, periodId, segment = 'all') {
+  const p = summary?.arr?.[periodId]
+  if (!p) return null
+  const names = segment === 'all' ? summary.segments : [segment]
+  const out = new Float32Array(N)
+  for (const name of names) {
+    const a = p[name]
+    if (a) for (let i = 0; i < N; i++) out[i] += a[i]
+  }
+  return out
+}

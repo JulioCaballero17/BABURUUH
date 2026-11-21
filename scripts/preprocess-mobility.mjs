@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { buildSummary } from './build-summary.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const RAW = process.argv[2]
@@ -174,3 +175,7 @@ if (report.unknownSegment.size) console.log('Tipos de viajero desconocidos:', Ob
 if (report.unknownBarrio.size) console.log('Barrios sin reconocer:', Object.fromEntries([...report.unknownBarrio].slice(0, 20)))
 if (nameWarnings.size) console.log('Nombres que no coinciden con el código (se usa el código):', [...nameWarnings])
 console.log(`Escritos ${index.length} periodos en ${OUT}`)
+
+// Resumen ligero (media de llegadas y salidas por periodo) para la evolución mensual y la comparación de periodos.
+buildSummary(OUT)
+console.log('Escrito summary.json')

@@ -7,8 +7,11 @@ const SHORTCUTS = [
   ['1 – 5', 'Ir de lunes a viernes'],
   ['← →', 'Día anterior / siguiente'],
   ['Ctrl K  ·  /', 'Buscar barrio o acción'],
-  ['L B R G S I', 'Paneles: capas, burbujas, ranking, distritos, historias, datos'],
-  ['D', 'Comparar con el lunes'],
+  ['T', 'Empezar o salir del tour'],
+  ['L', 'Mapa: capas y colores'],
+  ['R  G  B  N', 'Análisis: ranking, distritos, burbujas, hallazgos'],
+  ['I', 'Datos: periodo, viajeros, importar y exportar'],
+  ['D', 'Comparar el día con el lunes'],
   ['O', 'Órbita automática de la cámara'],
   ['H', 'Volver a la vista inicial'],
   ['P', 'Descargar una captura'],
@@ -28,7 +31,7 @@ export function HelpOverlay() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p className="eyebrow">Ayuda</p>
-                <h2 className="serif" style={{ margin: '4px 0 0', fontSize: 34, lineHeight: 1 }}>Atajos de teclado</h2>
+                <h2 className="display" style={{ margin: '4px 0 0', fontSize: 26, lineHeight: 1.1 }}>Atajos de teclado</h2>
               </div>
               <button className="icon-btn" onClick={() => setHelp(false)} aria-label="Cerrar ayuda"><X /></button>
             </div>
@@ -40,7 +43,7 @@ export function HelpOverlay() {
                 </div>
               ))}
             </dl>
-            <p className="note" style={{ marginTop: 18 }}>Ratón: arrastra para mover, clic derecho o Ctrl + arrastrar para girar e inclinar, rueda para acercar. Haz clic en un barrio para abrir su ficha.</p>
+            <p className="note" style={{ marginTop: 18 }}>Ratón: arrastra para mover, clic derecho o Ctrl + arrastrar para girar e inclinar, rueda para acercar. Haz clic en un barrio para abrir su ficha. Durante el tour, las flechas o un mando de presentaciones pasan de paso.</p>
           </motion.div>
         </>
       )}

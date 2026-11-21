@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { BARRIOS } from './model/geo.js'
 import { simulateWeek, STEPS } from './model/simulate.js'
 import { deriveDataset } from './model/derive.js'
-import { loadIndex, loadPeriod, cubeFor, segmentLabel } from './model/realData.js'
+import { loadIndex, loadPeriod, cubeFor, segmentLabel, segmentArrivals, loadSummary } from './model/realData.js'
 
 export const BASE_ATTRS = { pop: BARRIOS.map((b) => b.pop), rest: BARRIOS.map((b) => b.rest) }
 const SIM_F = simulateWeek()
@@ -21,6 +21,9 @@ export const useStore = create((set, get) => ({
   period: 'all',
   segment: 'all', // 'all' | 'Residente' | 'Regional' | 'Nacional' | 'Internacional'
   dataState: 'loading', // loading | ok | error | csv
+  summary: null, // average weekday arrivals for every period (monthly evolution, period comparison)
+  comparePeriod: 'all', // reference period for the 'period' colour mode
+  visitorKind: 'all', // 'all' = every non-resident | 'intl' = international visitors only
 
   // ---------- time (in days: 0 = Monday … 4 = Friday; fractional only while animating) ----------
   t: 0,
@@ -48,7 +51,7 @@ export const useStore = create((set, get) => ({
   hoverStudy: -1,
 
   // ---------- ui ----------
-  panel: 'historias',
+  panel: null, // capas | ranking | distritos | estudio | hallazgos | datos
   cmdk: false,
   help: false,
   compareOpen: false,
@@ -79,7 +82,21 @@ export const useStore = create((set, get) => ({
   setColorMode: (colorMode) => {
     const s = get()
     if (colorMode === 'influence' && s.sel < 0) get().toast('Elige un barrio para ver adónde va su gente.', 'info')
+    if (colorMode === 'period') {
+      if (s.comparePeriod === s.period || (s.periods.length && !s.periods.some((p) => p.id === s.comparePeriod))) set({ comparePeriod: defaultCompare(s.period, s.periods) })
+      if (!s.summary) get().loadSummary()
+    }
     set({ colorMode })
+  },
+  setComparePeriod: (comparePeriod) => set({ comparePeriod }),
+  setVisitorKind: (visitorKind) => set({ visitorKind }),
+  loadSummary: async () => {
+    try {
+      const summary = await loadSummary()
+      set({ summary })
+    } catch (e) {
+      console.warn('No se pudo cargar summary.json:', e)
+    }
   },
   setDeltaBase: (deltaBase) => set({ deltaBase }),
   setInfluenceDir: (influenceDir) => set({ influenceDir }),
@@ -134,9 +151,11 @@ export const useStore = create((set, get) => ({
         kind: 'real',
         label: `${p.label} · ${segmentLabel(segment)}`,
         period: p.label,
+        periodId: p.id,
         segment,
         nDays: p.nDays,
       })
+      ds.segArr = segmentArrivals(p) // every traveller type, whatever the filter (residents vs visitors view)
       set({ dataset: ds, period, segment, dataState: 'ok' })
     } catch (e) {
       if (seq !== loadSeq) return
@@ -145,7 +164,11 @@ export const useStore = create((set, get) => ({
       get().toast('No encuentro los datos reales (public/data/movilidad). Se muestran datos simulados.', 'info')
     }
   },
-  setPeriod: (period) => get().loadReal(period, get().segment),
+  setPeriod: (period) => {
+    const s = get()
+    if (s.comparePeriod === period) set({ comparePeriod: defaultCompare(period, s.periods) })
+    return get().loadReal(period, s.segment)
+  },
   setSegment: (segment) => (get().dataState === 'csv' ? get().applyCsv(segment) : get().loadReal(get().period, segment)),
 
   toast: (text, kind = 'ok') => {
@@ -154,6 +177,18 @@ export const useStore = create((set, get) => ({
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), 4200)
   },
 }))
+
+// Reference period for "compare periods": the same month a year earlier, the previous year, or the whole series.
+export function defaultCompare(period, periods) {
+  const has = (id) => periods.some((p) => p.id === id)
+  if (/^\d{4}-\d{2}$/.test(period)) {
+    const prev = `${Number(period.slice(0, 4)) - 1}${period.slice(4)}`
+    if (has(prev)) return prev
+  }
+  if (/^\d{4}$/.test(period) && has(String(Number(period) - 1))) return String(Number(period) - 1)
+  if (period === 'all') return periods.find((p) => p.kind === 'year')?.id || 'all'
+  return 'all'
+}
 
 // Effective UI theme. The data has no hours, so there is no day/night cycle: 'auto' means light.
 export const selectDark = (s) => s.theme === 'dark'
