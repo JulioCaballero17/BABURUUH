@@ -423,3 +423,10 @@ input[type='range'].range::-moz-range-thumb { width: 12px; height: 12px; border-
   .intro-stats { gap: 18px; }
   .popover { position: fixed; left: 10px; right: 10px; width: auto; top: 70px; }
 }
+
+/* ---- period / traveller pickers (real data is daily: no clock) ---- */
+.clock .period-select { font: 500 13px/1.2 var(--font-ui); color: var(--ink); background: transparent; border: 0; border-bottom: 1.5px dashed var(--glass-border); padding: 2px 18px 2px 0; margin-top: 6px; max-width: 190px; cursor: pointer; }
+.clock .period-select:focus-visible { outline: 2px solid var(--day); outline-offset: 2px; border-radius: 3px; }
+.clock .period-select option { color: #111; }
+.loading-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--day); animation: pulse-dot 1s ease-in-out infinite; }
+@keyframes pulse-dot { 50% { opacity: 0.25; } }

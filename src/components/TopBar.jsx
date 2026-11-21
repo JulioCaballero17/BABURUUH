@@ -7,7 +7,7 @@ import { BrandMark, WeatherIcon } from './ui/primitives.jsx'
 import { capturePNG } from '../engine/mapEngine.js'
 import { weatherText } from '../lib/apis.js'
 import { DAYS } from '../lib/colors.js'
-import { dayDate, dayName, clockText, dateFor } from '../lib/week.js'
+import { dayName } from '../lib/week.js'
 import { legendFor, MODES } from '../lib/legend.js'
 
 function WeatherChip() {
@@ -53,7 +53,7 @@ function WeatherChip() {
                 </div>
               ))}
             </div>
-            <p className="note" style={{ marginTop: 12 }}>Previsión real de Open-Meteo para la semana que se muestra en el mapa. Útil para cruzar lluvia y movilidad.</p>
+            <p className="note" style={{ marginTop: 12 }}>Tiempo actual y previsión de esta semana (Open-Meteo). No corresponde al periodo de los datos de movilidad.</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -72,20 +72,19 @@ export default function TopBar() {
   const cycleTheme = () => {
     const next = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'
     setTheme(next)
-    toast(next === 'auto' ? 'El tema sigue al sol de la hora seleccionada.' : next === 'light' ? 'Tema claro fijado.' : 'Tema oscuro fijado.')
+    toast(next === 'auto' ? 'Tema automático (claro).' : next === 'light' ? 'Tema claro fijado.' : 'Tema oscuro fijado.')
   }
   const capture = async () => {
     const s = useStore.getState()
     const lg = legendFor(s)
     const url = await capturePNG({
-      title: `${dayName(s.t)} ${dayDate(Math.floor(s.t / 24))}, ${clockText(s.t)}`,
-      subtitle: `Pulso de Barcelona · ${MODES[s.colorMode].label}${s.sel >= 0 ? ' · barrio seleccionado' : ''}`,
+      title: `${dayName(s.t)} medio`,
+      subtitle: `Pulso de Barcelona · ${s.dataset.source.label} · ${MODES[s.colorMode].label}${s.sel >= 0 ? ' · barrio seleccionado' : ''}`,
       legend: lg,
     })
     if (!url) return
     const a = document.createElement('a')
-    const d = dateFor(s.t)
-    a.download = `pulso-bcn-${d.toISOString().slice(0, 10)}-${clockText(s.t).replace(':', 'h')}.png`
+    a.download = `pulso-bcn-${s.period}-${dayName(s.t).toLowerCase()}.png`
     a.href = url
     a.click()
     toast('Captura descargada.')

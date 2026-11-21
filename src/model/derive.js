@@ -1,27 +1,25 @@
-// Turns a raw origin→destination cube (120 hours × N × N) into everything the UI needs.
+// Turns a raw DAILY origin→destination cube (5 weekdays × N × N trips) into everything the UI needs.
+// Index 0 = Monday … 4 = Friday. The data has no hours, so every metric is per day.
 import { BARRIOS, N } from './geo.js'
-import { HOURS } from './simulate.js'
+import { STEPS } from './simulate.js'
 import { DAYS } from '../lib/colors.js'
-
-export const EVENING = [20, 21, 22, 23]
-const DAYTIME = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-const NIGHT = [0, 1, 2, 22, 23]
 
 const quantile = (arr, q) => {
   const s = Float64Array.from(arr).sort()
   return s[Math.floor(q * (s.length - 1))] || 0
 }
+const WEEK = [0, 1, 2, 3, 4]
 
 export function deriveDataset(F, attrs, source = { kind: 'simulado', label: 'Datos simulados' }) {
   const pop = attrs.pop
   const rest = attrs.rest
   const area = BARRIOS.map((b) => b.area)
-  const ARR = []
-  const DEP = []
-  const STAY = []
-  const MOV = new Float32Array(HOURS)
-  const DENS = []
-  for (let t = 0; t < HOURS; t++) {
+  const ARR = [] // trips arriving at each barrio (including the ones that stay inside)
+  const DEP = [] // trips starting in each barrio
+  const STAY = [] // trips that start and end in the same barrio
+  const MOV = new Float32Array(STEPS) // trips between different barrios, whole city
+  const DENS = [] // arrivals per km²
+  for (let t = 0; t < STEPS; t++) {
     const a = new Float32Array(N)
     const d = new Float32Array(N)
     const s = new Float32Array(N)
@@ -45,82 +43,78 @@ export function deriveDataset(F, attrs, source = { kind: 'simulado', label: 'Dat
   }
   const allDens = []
   DENS.forEach((d) => d.forEach((v) => allDens.push(v)))
-  const densRef = quantile(allDens, 0.995) || 1
+  const densRef = quantile(allDens, 0.97) || 1
   const maxMov = Math.max(...MOV) || 1
-  const DAYTOT = [0, 1, 2, 3, 4].map((d) => { let s = 0; for (let h = 0; h < 24; h++) s += MOV[d * 24 + h]; return s })
+  const DAYTOT = Array.from(MOV)
   const maxArr = Math.max(...ARR.map((a) => Math.max(...a))) || 1
-
-  const bubbleOf = (i, d, hours) => {
-    let s = 0
-    let tot = 0
-    for (const h of hours) { const t = d * 24 + h; s += STAY[t][i]; tot += DEP[t][i] }
-    return tot ? s / tot : 0
-  }
-  const avgOver = (A, i, d, hours) => hours.reduce((s, h) => s + A[d * 24 + h][i], 0) / hours.length
-  const ALL24 = Array.from({ length: 24 }, (_, h) => h)
 
   const metrics = BARRIOS.map((b) => {
     const i = b.i
-    const bub = [0, 1, 2, 3, 4].map((d) => bubbleOf(i, d, EVENING))
-    const bubDay = [0, 1, 2, 3, 4].map((d) => bubbleOf(i, d, ALL24))
-    const eve = [0, 1, 2, 3, 4].map((d) => avgOver(ARR, i, d, EVENING))
+    // bubble index: of all trips that START in the barrio that day, the share that also END there
+    const bub = WEEK.map((d) => (DEP[d][i] ? STAY[d][i] / DEP[d][i] : 0))
     let max = 0
     let peak = 0
     let weekArr = 0
-    for (let t = 0; t < HOURS; t++) { const v = ARR[t][i]; weekArr += v; if (v > max) { max = v; peak = t } }
-    const night = [0, 1, 2, 3, 4].reduce((s, d) => s + avgOver(ARR, i, d, NIGHT), 0) / 5
-    const dayA = [0, 1, 2, 3, 4].reduce((s, d) => s + avgOver(ARR, i, d, DAYTIME), 0) / 5
-    let mornOut = 0
-    let mornIn = 0
-    for (let d = 0; d < 5; d++) for (const h of [7, 8, 9]) { const t = d * 24 + h; mornOut += DEP[t][i] - STAY[t][i]; mornIn += ARR[t][i] - STAY[t][i] }
+    let weekDep = 0
+    let visitors = 0
+    for (let d = 0; d < STEPS; d++) {
+      const v = ARR[d][i]
+      weekArr += v
+      weekDep += DEP[d][i]
+      visitors += v - STAY[d][i]
+      if (v > max) { max = v; peak = d }
+    }
+    const avgArr = weekArr / STEPS
     return {
-      i, bub, bubDay,
-      bubAvg: bub.reduce((a, c) => a + c, 0) / 5,
-      eve,
-      friE: eve[0] ? eve[4] / eve[0] : 1,
-      thuE: eve[2] ? eve[3] / eve[2] : 1,
-      max, peak, weekArr, night, dayA,
-      nightRatio: dayA ? night / dayA : 0,
-      mornOut, mornIn,
-      perCapita: pop[i] ? weekArr / (pop[i] * 1000) : 0,
+      i,
+      bub,
+      bubAvg: bub.reduce((a, c) => a + c, 0) / STEPS,
+      arr: WEEK.map((d) => ARR[d][i]),
+      friE: ARR[0][i] ? ARR[4][i] / ARR[0][i] : 1, // Friday vs Monday arrivals
+      peakE: avgArr ? max / avgArr : 1, // how much the busiest day stands out
+      max, peak, weekArr, weekDep,
+      visitorShare: weekArr ? visitors / weekArr : 0, // arrivals that come from another barrio
+      visitorsPerRes: pop[i] ? visitors / STEPS / (pop[i] * 1000) : 0,
+      tripsPerRes: pop[i] ? weekDep / STEPS / (pop[i] * 1000) : 0,
     }
   })
 
-  const cityBub = [0, 1, 2, 3, 4].map((d) => {
+  // city-wide bubble per day
+  const cityBub = WEEK.map((d) => {
     let s = 0
     let tot = 0
-    for (const h of EVENING) { const t = d * 24 + h; for (let i = 0; i < N; i++) { s += STAY[t][i]; tot += DEP[t][i] } }
+    for (let i = 0; i < N; i++) { s += STAY[d][i]; tot += DEP[d][i] }
     return tot ? s / tot : 0
   })
 
-  // personality tags (data-driven, so they also work for imported data)
-  const eligible = metrics.filter((m) => pop[m.i] >= 5)
+  // The real data only records trips BETWEEN different barrios (no origin = destination rows),
+  // so the bubble index is 0 everywhere. hasStays = false makes the UI skip bubble-based text.
+  const hasStays = cityBub.some((v) => v > 0)
+
+  // personality tags (data-driven, so they work for any period / traveller type)
+  const eligible = metrics.filter((m) => pop[m.i] >= 5 && m.weekArr > 0)
   const rankDesc = (key) => [...eligible].sort((a, b) => b[key] - a[key]).map((m) => m.i)
-  const friTop = new Set(rankDesc('friE').slice(0, 8))
-  const thuTop = new Set(rankDesc('thuE').slice(0, 5))
-  const medNR = quantile(metrics.map((m) => m.nightRatio), 0.5) || 1
+  const friTop = new Set(rankDesc('friE').slice(0, 6))
   const bubHi = quantile(metrics.map((m) => m.bubAvg), 0.85)
   const bubLo = quantile(metrics.map((m) => m.bubAvg), 0.15)
+  const visHi = quantile(metrics.map((m) => m.visitorsPerRes), 0.85)
+  const visLo = quantile(metrics.map((m) => m.visitorsPerRes), 0.15)
   metrics.forEach((m) => {
-    const nr = m.nightRatio / medNR
-    const w = BARRIOS[m.i].wrk
-    const wedPeak = DAYS[Math.floor(m.peak / 24)].key === 'X' && m.peak % 24 >= 18
-    if (wedPeak && m.max > 3 * m.dayA) m.tag = { label: 'Noche de evento', text: 'Su pico de la semana llega un miércoles por la tarde-noche: un evento multiplica sus llegadas.' }
-    else if (friTop.has(m.i) && m.friE > 1.25) m.tag = { label: 'Rey del viernes', text: `El viernes por la noche recibe un ${Math.round((m.friE - 1) * 100)} % más de gente que el lunes.` }
-    else if (thuTop.has(m.i) && m.thuE > 1.15) m.tag = { label: 'Jueves universitario', text: `El jueves por la noche crece un ${Math.round((m.thuE - 1) * 100)} % respecto al miércoles.` }
-    else if (w >= 0.7 && nr < 0.85) m.tag = { label: 'Imán de oficinas', text: 'Se llena en horario laboral y se apaga al acabar la jornada.' }
-    else if (m.bubAvg >= bubHi) m.tag = { label: 'Burbuja cerrada', text: 'De 20 a 24 h, gran parte de sus vecinos no sale del barrio.' }
-    else if (m.mornOut > m.mornIn * 1.9) m.tag = { label: 'Barrio dormitorio', text: 'Por la mañana sale bastante más gente de la que llega.' }
-    else if (m.bubAvg <= bubLo) m.tag = { label: 'Barrio viajero', text: 'Sus vecinos se van a otros barrios para casi todo.' }
+    if (m.peakE > 1.3) m.tag = { label: `Día fuerte: ${DAYS[m.peak].name.toLowerCase()}`, text: `El ${DAYS[m.peak].name.toLowerCase()} recibe un ${Math.round((m.peakE - 1) * 100)} % más de llegadas que su media de lunes a viernes.` }
+    else if (friTop.has(m.i) && m.friE > 1.08) m.tag = { label: 'Rey del viernes', text: `El viernes recibe un ${Math.round((m.friE - 1) * 100)} % más de llegadas que el lunes.` }
+    else if (m.visitorsPerRes >= visHi) m.tag = { label: 'Imán de visitantes', text: 'Recibe mucha gente de otros barrios en relación con los vecinos que tiene.' }
+    else if (hasStays && m.bubAvg >= bubHi) m.tag = { label: 'Burbuja cerrada', text: 'Una gran parte de los viajes que empiezan aquí no salen del barrio.' }
+    else if (hasStays && m.bubAvg <= bubLo) m.tag = { label: 'Barrio viajero', text: 'Sus vecinos se van a otros barrios para casi todo.' }
+    else if (m.visitorsPerRes <= visLo) m.tag = { label: 'Barrio residencial', text: 'Llega poca gente de fuera en relación con los vecinos que tiene.' }
     else m.tag = { label: 'Barrio equilibrado', text: 'Combina vida de barrio con salidas al resto de la ciudad.' }
   })
 
-  // regression: restaurants vs bubble (per day)
-  const regression = [0, 1, 2, 3, 4].map((d) => linreg(metrics.map((m) => rest[m.i]), metrics.map((m) => m.bub[d])))
+  // regression: restaurants vs bubble (per day and whole week)
+  const regression = WEEK.map((d) => linreg(metrics.map((m) => rest[m.i]), metrics.map((m) => m.bub[d])))
   const regressionWeek = linreg(metrics.map((m) => rest[m.i]), metrics.map((m) => m.bubAvg))
 
   const ds = {
-    F, ARR, DEP, STAY, MOV, DENS, densRef, maxMov, maxArr, DAYTOT, metrics, cityBub,
+    F, ARR, DEP, STAY, MOV, DENS, densRef, maxMov, maxArr, DAYTOT, metrics, cityBub, hasStays,
     regression, regressionWeek, pop, rest, source,
     version: Date.now(),
   }
@@ -140,65 +134,60 @@ export function linreg(xs, ys) {
 
 const pct = (v) => `${Math.round(v * 100)} %`
 const fmt = (n) => Math.round(n).toLocaleString('es-ES')
-const hh = (h) => `${String(h).padStart(2, '0')}:00`
 
 function buildInsights(ds) {
-  const { metrics, MOV, DAYTOT, cityBub, ARR, pop } = ds
+  const { metrics, DAYTOT, cityBub, pop, hasStays } = ds
   const out = []
-  const elig = metrics.filter((m) => pop[m.i] >= 5)
+  const elig = metrics.filter((m) => pop[m.i] >= 5 && m.weekArr > 0)
   const fr = [...elig].sort((a, b) => b.friE - a.friE)[0]
-  if (fr && fr.friE > 1.05) out.push({ day: 4, t: 4 * 24 + 22, sel: fr.i, title: 'Efecto viernes', text: `${BARRIOS[fr.i].name} recibe un ${Math.round((fr.friE - 1) * 100)} % más de gente el viernes por la noche que el lunes.` })
-  const th = [...elig].sort((a, b) => b.thuE - a.thuE)[0]
-  if (th && th.thuE > 1.05) out.push({ day: 3, t: 3 * 24 + 23, sel: th.i, title: 'Jueves universitario', text: `El jueves por la noche, ${BARRIOS[th.i].name} crece un ${Math.round((th.thuE - 1) * 100)} % respecto al miércoles.` })
-  const ev = metrics.find((m) => m.tag.label === 'Noche de evento')
-  if (ev) {
-    const t = ev.peak
-    const others = [0, 1, 3].map((d) => ARR[d * 24 + (t % 24)][ev.i])
-    const ratio = ARR[t][ev.i] / (others.reduce((a, b) => a + b, 0) / others.length || 1)
-    out.push({ day: Math.floor(t / 24), t, sel: ev.i, title: 'Noche de evento', text: `${DAYS[Math.floor(t / 24)].name} a las ${hh(t % 24)}: las llegadas a ${BARRIOS[ev.i].name} se multiplican por ${ratio.toLocaleString('es-ES', { maximumFractionDigits: 1 })}.` })
-  }
-  const dir = cityBub[4] - cityBub[0]
-  out.push({ day: 4, t: 4 * 24 + 22, title: dir < 0 ? 'La burbuja se abre' : 'La burbuja se cierra', text: `De 20 a 24 h, el lunes se queda en su barrio el ${pct(cityBub[0])} de los viajes; el viernes, el ${pct(cityBub[4])}.` })
-  let pk = 0
-  for (let t = 1; t < MOV.length; t++) if (MOV[t] > MOV[pk]) pk = t
-  out.push({ day: Math.floor(pk / 24), t: pk, title: 'Hora punta de la semana', text: `${DAYS[Math.floor(pk / 24)].name} a las ${hh(pk % 24)}: ${fmt(MOV[pk])} personas cambian de barrio en una hora.` })
+  if (fr && fr.friE > 1.03) out.push({ day: 4, t: 4, sel: fr.i, title: 'Efecto viernes', text: `${BARRIOS[fr.i].name} recibe un ${Math.round((fr.friE - 1) * 100)} % más de llegadas el viernes que el lunes.` })
+  const pk = [...elig].sort((a, b) => b.peakE - a.peakE)[0]
+  if (pk && pk.peakE > 1.1) out.push({ day: pk.peak, t: pk.peak, sel: pk.i, title: 'El día más distinto', text: `El ${DAYS[pk.peak].name.toLowerCase()}, ${BARRIOS[pk.i].name} recibe un ${Math.round((pk.peakE - 1) * 100)} % más de gente que su media semanal.` })
+  const hi = cityBub.indexOf(Math.max(...cityBub))
+  const lo = cityBub.indexOf(Math.min(...cityBub))
+  if (hasStays) out.push({ day: lo, t: lo, title: 'Cuándo se abre la burbuja', text: `El ${DAYS[hi].name.toLowerCase()} se queda en su barrio el ${pct(cityBub[hi])} de los viajes; el ${DAYS[lo].name.toLowerCase()}, el ${pct(cityBub[lo])}.` })
   const bd = DAYTOT.indexOf(Math.max(...DAYTOT))
   const ld = DAYTOT.indexOf(Math.min(...DAYTOT))
-  out.push({ day: bd, t: bd * 24 + 13, title: 'El día con más vida', text: `${DAYS[bd].name} suma ${fmt(DAYTOT[bd])} desplazamientos entre barrios, un ${Math.round((DAYTOT[bd] / DAYTOT[ld] - 1) * 100)} % más que el ${DAYS[ld].name.toLowerCase()}.` })
+  out.push({ day: bd, t: bd, title: 'El día con más vida', text: `El ${DAYS[bd].name.toLowerCase()} suma ${fmt(DAYTOT[bd])} viajes entre barrios, un ${Math.round((DAYTOT[bd] / (DAYTOT[ld] || 1) - 1) * 100)} % más que el ${DAYS[ld].name.toLowerCase()}.` })
   const closed = [...elig].sort((a, b) => b.bubAvg - a.bubAvg)[0]
-  if (closed) out.push({ day: 2, t: 2 * 24 + 21, sel: closed.i, title: 'La burbuja más cerrada', text: `En ${BARRIOS[closed.i].name}, el ${pct(closed.bubAvg)} de los viajes de 20 a 24 h empiezan y acaban dentro del barrio.` })
+  if (hasStays && closed) out.push({ day: 2, t: 2, sel: closed.i, title: 'La burbuja más cerrada', text: `En ${BARRIOS[closed.i].name}, el ${pct(closed.bubAvg)} de los viajes que empiezan en el barrio también acaban en él.` })
+  const open = [...elig].sort((a, b) => a.bubAvg - b.bubAvg)[0]
+  if (hasStays && open) out.push({ day: 2, t: 2, sel: open.i, title: 'La burbuja más abierta', text: `En ${BARRIOS[open.i].name} solo el ${pct(open.bubAvg)} de los viajes se queda dentro del barrio.` })
+  const vis = [...elig].sort((a, b) => b.visitorsPerRes - a.visitorsPerRes)[0]
+  if (vis) out.push({ day: 2, t: 2, sel: vis.i, title: 'El gran imán', text: `${BARRIOS[vis.i].name} recibe cada día ${vis.visitorsPerRes.toLocaleString('es-ES', { maximumFractionDigits: 1 })} visitantes de otros barrios por cada vecino.` })
   return out
 }
 
-// helpers used across the UI
+// ---- helpers used across the UI (t is a day position: 0 = Monday … 4 = Friday, fractional while animating)
+export const stepOf = (t) => ((Math.round(t) % STEPS) + STEPS) % STEPS
 export const lerpArr = (A, t) => {
-  const t0 = Math.floor(t) % HOURS
-  const t1 = (t0 + 1) % HOURS
+  const t0 = ((Math.floor(t) % STEPS) + STEPS) % STEPS
+  const t1 = (t0 + 1) % STEPS
   const f = t - Math.floor(t)
   const o = new Float32Array(A[0].length)
   for (let k = 0; k < o.length; k++) o[k] = A[t0][k] * (1 - f) + A[t1][k] * f
   return o
 }
 export const valueAt = (series, t) => {
-  const t0 = Math.floor(t) % HOURS
-  const t1 = (t0 + 1) % HOURS
+  const t0 = ((Math.floor(t) % STEPS) + STEPS) % STEPS
+  const t1 = (t0 + 1) % STEPS
   const f = t - Math.floor(t)
   return series[t0] * (1 - f) + series[t1] * f
 }
 export function topFrom(ds, i, t, k = 5) {
-  const Ft = ds.F[Math.floor(t) % HOURS]
+  const Ft = ds.F[stepOf(t)]
   const out = []
   for (let j = 0; j < N; j++) if (j !== i) out.push({ j, v: Ft[i * N + j] })
   return out.sort((a, b) => b.v - a.v).slice(0, k)
 }
 export function topTo(ds, i, t, k = 5) {
-  const Ft = ds.F[Math.floor(t) % HOURS]
+  const Ft = ds.F[stepOf(t)]
   const out = []
   for (let j = 0; j < N; j++) if (j !== i) out.push({ j, v: Ft[j * N + i] })
   return out.sort((a, b) => b.v - a.v).slice(0, k)
 }
 export function districtMatrix(ds, t) {
-  const Ft = ds.F[Math.floor(t) % HOURS]
+  const Ft = ds.F[stepOf(t)]
   const M = Array.from({ length: 10 }, () => new Array(10).fill(0))
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) M[BARRIOS[i].dist - 1][BARRIOS[j].dist - 1] += Ft[i * N + j]
   return M

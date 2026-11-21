@@ -1,116 +1,122 @@
-// Guided chapters. Each one sets time, layers, colour mode and camera, and writes its text from the data.
+// Guided chapters. Each one sets the day, layers, colour mode and camera, and writes its text from the data.
 import { BARRIOS, N } from '../model/geo.js'
-import { OFFICE_22 } from '../data/attributes.js'
 import { fmt, pct } from './format.js'
 import { DAYS } from './colors.js'
 
-const topArrival = (ds, t) => {
-  const a = ds.ARR[Math.floor(t)]
+const topArrival = (ds, d) => {
+  const a = ds.ARR[d]
   let best = 0
-  for (let i = 1; i < N; i++) if (a[i] > a[best]) best = i
+  for (let i = 1; i < N; i++) if (a[i] - ds.STAY[d][i] > a[best] - ds.STAY[d][best]) best = i
   return best
 }
-const fromOutside = (ds, t, i) => {
-  const Ft = ds.F[Math.floor(t)]
+const fromOutside = (ds, d, i) => {
+  const Ft = ds.F[d]
   let tot = 0
   let other = 0
   for (let j = 0; j < N; j++) { const v = Ft[j * N + i]; tot += v; if (BARRIOS[j].dist !== BARRIOS[i].dist) other += v }
   return tot ? other / tot : 0
 }
+const dn = (d) => DAYS[d].name.toLowerCase()
 
 export function buildChapters(ds) {
   const ch = []
-  const t1 = 8.25
-  const a1 = topArrival(ds, t1)
+  const periodTxt = ds.source.kind === 'real' ? ` (${ds.source.period.toLowerCase()}, ${segmentTxt(ds.source.segment)})` : ''
+  const a1 = topArrival(ds, 0)
   ch.push({
     id: 'despertar',
-    title: 'La ciudad se despierta',
-    t: t1,
+    title: 'Un lunes cualquiera',
+    t: 0,
     sel: -1,
     colorMode: 'activity',
     layers: { flows: true, barrios: '3d', hex: false, bubbles: false },
     cam: { center: [2.163, 41.392], zoom: 12.35, pitch: 58, bearing: -24 },
-    body: `Lunes, 8:15. En una sola hora, **${fmt(ds.MOV[8])} personas** cambian de barrio. Las columnas más altas marcan dónde se concentra la llegada: hoy gana **${BARRIOS[a1].name}**.`,
+    body: `Un lunes medio${periodTxt}, **${fmt(ds.MOV[0])} viajes** cruzan de un barrio a otro. Las columnas más altas marcan dónde se concentra la llegada: el que más visitantes recibe es **${BARRIOS[a1].name}**.`,
   })
 
-  const office = ds.metrics.some((m) => m.i === OFFICE_22) ? OFFICE_22 : [...ds.metrics].sort((a, b) => b.dayA - a.dayA)[0].i
-  const t2 = 24 + 9.5
+  const elig = ds.metrics.filter((m) => ds.pop[m.i] >= 5 && m.weekArr > 0)
+  const mag = [...elig].sort((a, b) => b.visitorsPerRes - a.visitorsPerRes)[0] || ds.metrics[0]
   ch.push({
-    id: 'oficinas',
-    title: 'El imán de las oficinas',
-    t: t2,
-    sel: office,
+    id: 'iman',
+    title: 'El gran imán',
+    t: 1,
+    sel: mag.i,
     colorMode: 'influence',
     influenceDir: 'in',
     layers: { flows: true, barrios: '3d', arcs: true },
-    cam: { center: BARRIOS[office].c, zoom: 13.1, pitch: 62, bearing: -60 },
-    body: `Martes, 9:30. **${BARRIOS[office].name}** se llena de gente que no vive allí: el **${pct(fromOutside(ds, t2, office))}** de quien llega viene de otro distrito. El color muestra de dónde sale.`,
+    cam: { center: BARRIOS[mag.i].c, zoom: 13.1, pitch: 62, bearing: -60 },
+    body: `**${BARRIOS[mag.i].name}** recibe cada día **${mag.visitorsPerRes.toLocaleString('es-ES', { maximumFractionDigits: 1 })} visitantes por vecino**. El martes, el **${pct(fromOutside(ds, 1, mag.i))}** de quien llega viene de otro distrito. El color muestra de dónde sale.`,
   })
 
-  const ev = ds.metrics.find((m) => m.tag.label === 'Noche de evento')
-  if (ev) {
+  const pk = [...elig].sort((a, b) => b.peakE - a.peakE)[0]
+  if (pk && pk.peakE > 1.1) {
     ch.push({
-      id: 'evento',
-      title: 'Noche de partido',
-      t: ev.peak,
-      sel: ev.i,
-      colorMode: 'influence',
-      influenceDir: 'in',
+      id: 'pico',
+      title: 'El día que cambia todo',
+      t: pk.peak,
+      sel: pk.i,
+      colorMode: 'delta',
+      deltaBase: pk.peak === 0 ? 1 : 0,
       layers: { flows: true, arcs: true, barrios: '3d' },
-      cam: { center: BARRIOS[ev.i].c, zoom: 12.9, pitch: 66, bearing: 30 },
-      body: `${DAYS[Math.floor(ev.peak / 24)].name}, ${String(ev.peak % 24).padStart(2, '0')}:00. Un evento convierte **${BARRIOS[ev.i].name}** en el barrio más visitado de la ciudad: **${fmt(ds.ARR[ev.peak][ev.i])} llegadas** en una hora, desde todos los distritos.`,
+      cam: { center: BARRIOS[pk.i].c, zoom: 12.9, pitch: 66, bearing: 30 },
+      body: `El ${dn(pk.peak)}, **${BARRIOS[pk.i].name}** recibe un **${Math.round((pk.peakE - 1) * 100)} % más** de gente que su media de lunes a viernes. El color compara cada barrio con el ${dn(pk.peak === 0 ? 1 : 0)}.`,
     })
   }
 
-  const thu = [...ds.metrics].filter((m) => ds.pop[m.i] >= 5).sort((a, b) => b.thuE - a.thuE)[0]
-  ch.push({
-    id: 'jueves',
-    title: 'Jueves universitario',
-    t: 3 * 24 + 23.25,
-    sel: -1,
-    colorMode: 'delta',
-    deltaBase: 2,
-    layers: { hex: true, flows: true, barrios: '3d' },
-    cam: { center: BARRIOS[thu.i].c, zoom: 13, pitch: 60, bearing: 20 },
-    body: `Jueves, 23:15, comparado con el miércoles a la misma hora. Los tonos rosados crecen; **${BARRIOS[thu.i].name}** recibe un **${Math.round((thu.thuE - 1) * 100)} % más** de gente que la noche anterior.`,
-  })
-
+  const fri = [...elig].sort((a, b) => b.friE - a.friE)[0]
   ch.push({
     id: 'viernes',
-    title: 'Viernes: la burbuja se abre',
-    t: 4 * 24 + 22.5,
+    title: 'Llega el viernes',
+    t: 4,
+    sel: -1,
+    colorMode: 'delta',
+    deltaBase: 0,
+    layers: { hex: true, flows: true, barrios: '3d' },
+    cam: { center: BARRIOS[fri.i].c, zoom: 13, pitch: 60, bearing: 20 },
+    body: `Viernes comparado con el lunes. Los tonos rosados crecen y los azules bajan. **${BARRIOS[fri.i].name}** es el que más gana: **${fri.friE >= 1 ? '+' : '−'}${Math.abs(Math.round((fri.friE - 1) * 100))} %** de llegadas.`,
+  })
+
+  const hi = ds.cityBub.indexOf(Math.max(...ds.cityBub))
+  const lo = ds.cityBub.indexOf(Math.min(...ds.cityBub))
+  if (ds.hasStays) ch.push({
+    id: 'burbuja',
+    title: 'La burbuja de cada día',
+    t: lo,
     sel: -1,
     colorMode: 'bubble',
     layers: { bubbles: true, hex: false, flows: true, barrios: '2d' },
     cam: { center: [2.165, 41.392], zoom: 12.2, pitch: 64, bearing: -36 },
-    body: `De 20 a 24 h, el lunes el **${pct(ds.cityBub[0])}** de los viajes no sale del barrio. El viernes baja al **${pct(ds.cityBub[4])}**: la ciudad se mezcla. Cada globo flota más alto cuanto más cerrado es su barrio.`,
+    body: `El ${dn(hi)} el **${pct(ds.cityBub[hi])}** de los viajes no sale del barrio donde empieza; el ${dn(lo)} baja al **${pct(ds.cityBub[lo])}**. Cada globo flota más alto cuanto más cerrado es su barrio.`,
   })
 
-  const r = ds.regression[4].r
-  ch.push({
+  const r = ds.regressionWeek.r
+  if (ds.hasStays) ch.push({
     id: 'hipotesis',
     title: 'La hipótesis',
-    t: 4 * 24 + 22,
+    t: 4,
     sel: -1,
     colorMode: 'bubble',
     panel: 'estudio',
     layers: { bubbles: false, barrios: '3d', flows: false },
     cam: { center: [2.17, 41.392], zoom: 12.3, pitch: 50, bearing: -20 },
-    body: `¿Más restaurantes significan que la gente sale menos de su barrio? Con estos datos, el viernes por la noche la correlación es **r = ${r.toLocaleString('es-ES', { maximumFractionDigits: 2 })}**. El panel de la izquierda lo muestra barrio a barrio.`,
+    body: `¿Más restaurantes significan que la gente sale menos de su barrio? Con la burbuja media de lunes a viernes, la correlación es **r = ${r.toLocaleString('es-ES', { maximumFractionDigits: 2 })}**. El panel de la izquierda lo muestra barrio a barrio.`,
   })
 
   ch.push({
     id: 'turno',
-    title: 'Ahora, vuestros datos',
-    t: 4 * 24 + 22,
+    title: 'Explora otros periodos',
+    t: 2,
     sel: -1,
     colorMode: 'activity',
     panel: 'datos',
     layers: { bubbles: false, flows: true, barrios: '3d' },
     cam: { center: [2.161, 41.393], zoom: 12.25, pitch: 57, bearing: -28 },
-    body: ds.source.kind === 'simulado'
-      ? 'Todo lo que has visto sale de un modelo simulado. Arrastra el CSV real al panel Datos y el mapa, los rankings y la hipótesis se recalculan al momento.'
-      : 'Estás viendo los datos que has importado. Puedes volver a los simulados desde el panel Datos cuando quieras.',
+    body: ds.source.kind === 'real'
+      ? 'En el panel Datos puedes cambiar de mes o de año y mirar solo a los residentes o a los visitantes: el mapa, los rankings y la hipótesis se recalculan al momento.'
+      : 'Estás viendo datos simulados o importados. Desde el panel Datos puedes volver a los datos reales y elegir el periodo.',
   })
   return ch
+}
+
+function segmentTxt(s) {
+  return { all: 'todos los viajeros', Residente: 'residentes', Regional: 'visitantes de Cataluña', Nacional: 'visitantes del resto de España', Internacional: 'visitantes internacionales' }[s] || s
 }

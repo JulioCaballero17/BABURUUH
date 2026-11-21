@@ -1,13 +1,16 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileUp, Download, RotateCcw, Check, Info } from 'lucide-react'
-import { useStore, SIMULATED } from '../../store.js'
-import { readFile, detectKind, buildFlows, buildAttributes, flowsToCsv, TEMPLATE_CSV, ATTR_TEMPLATE_CSV } from '../../model/importCsv.js'
+import { useStore } from '../../store.js'
+import { readFile, readHeaders, detectKind, importFlows, buildAttributes, flowsToCsv, TEMPLATE_CSV, ATTR_TEMPLATE_CSV } from '../../model/importCsv.js'
 import { deriveDataset } from '../../model/derive.js'
 import { BARRIOS } from '../../model/geo.js'
 import { DAYS } from '../../lib/colors.js'
 import { fmt } from '../../lib/format.js'
 import { dayOf } from '../../lib/week.js'
+import { Segmented } from '../ui/primitives.jsx'
+import { PeriodSelect } from '../Dock.jsx'
+import { SEGMENTS, segmentLabel } from '../../model/realData.js'
 
 const download = (name, text, type = 'text/csv;charset=utf-8') => {
   const blob = new Blob(['﻿' + text], { type })
@@ -23,27 +26,33 @@ export default function DataPanel() {
   const attrs = useStore((s) => s.attrs)
   const report = useStore((s) => s.importReport)
   const loadDataset = useStore((s) => s.loadDataset)
+  const loadCsv = useStore((s) => s.loadCsv)
+  const csv = useStore((s) => s.csv)
   const resetDataset = useStore((s) => s.resetDataset)
   const toast = useStore((s) => s.toast)
+  const dataState = useStore((s) => s.dataState)
+  const segment = useStore((s) => s.segment)
+  const setSegment = useStore((s) => s.setSegment)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState(0)
   const input = useRef(null)
 
   const handle = async (file) => {
-    if (!file) return
+    if (!file || busy) return
     setBusy(true)
+    setProgress(0)
     try {
-      const res = await readFile(file)
-      const headers = res.meta.fields || []
+      const headers = await readHeaders(file)
       const kind = detectKind(headers)
       if (kind === 'flows') {
-        const { F, report: rep } = buildFlows(res.data, headers)
+        const { period, report: rep } = await importFlows(file, { onProgress: setProgress })
         if (rep.error) { toast(rep.error, 'info'); useStore.setState({ importReport: { ...rep, file: file.name, kind } }); return }
-        const next = deriveDataset(F, attrs, { kind: 'csv', label: `Datos reales · ${file.name}` })
-        loadDataset(next, { ...rep, file: file.name, kind })
+        loadCsv(period, { ...rep, file: file.name, kind })
         toast(`Importadas ${fmt(rep.used)} filas. Todo el mapa se ha recalculado.`)
       } else if (kind === 'attributes') {
-        const { attrs: na, report: rep } = buildAttributes(res.data, headers, attrs)
+        const res = await readFile(file)
+        const { attrs: na, report: rep } = buildAttributes(res.data, res.meta.fields || [], attrs)
         const next = deriveDataset(ds.F, na, ds.source)
         loadDataset(next, { ...rep, file: file.name, kind }, na)
         toast(`Atributos actualizados para ${rep.used} barrios.`)
@@ -60,12 +69,13 @@ export default function DataPanel() {
 
   const exportMetrics = () => {
     const d = dayOf(useStore.getState().t)
-    const rows = ['codigo,barrio,distrito,poblacion_miles,restaurantes_1000hab,llegadas_semana,pico_semana,burbuja_lun,burbuja_mar,burbuja_mie,burbuja_jue,burbuja_vie,efecto_viernes,perfil']
+    const rows = ['codigo,barrio,distrito,poblacion_miles,restaurantes_1000hab,llegadas_lun,llegadas_mar,llegadas_mie,llegadas_jue,llegadas_vie,dia_pico,burbuja_lun,burbuja_mar,burbuja_mie,burbuja_jue,burbuja_vie,burbuja_media,efecto_viernes,perfil']
     ds.metrics.forEach((m) => {
       const b = BARRIOS[m.i]
-      rows.push([b.code, `"${b.name}"`, `"${b.district}"`, ds.pop[m.i], ds.rest[m.i], Math.round(m.weekArr), `${DAYS[Math.floor(m.peak / 24)].name} ${m.peak % 24}h`, ...m.bub.map((v) => v.toFixed(4)), m.friE.toFixed(3), `"${m.tag.label}"`].join(','))
+      rows.push([b.code, `"${b.name}"`, `"${b.district}"`, ds.pop[m.i], ds.rest[m.i], ...m.arr.map((v) => Math.round(v)), DAYS[m.peak].name, ...m.bub.map((v) => v.toFixed(4)), m.bubAvg.toFixed(4), m.friE.toFixed(3), `"${m.tag.label}"`].join(','))
     })
-    download(`metricas-barrios-${DAYS[d].name.toLowerCase()}.csv`, rows.join('\n'))
+    const s = useStore.getState()
+    download(`metricas-barrios-${s.dataState === 'ok' ? `${s.period}-${s.segment}` : DAYS[d].name.toLowerCase()}.csv`, rows.join('\n'))
   }
 
   return (
@@ -73,9 +83,32 @@ export default function DataPanel() {
       <section>
         <div className="report" style={{ gridTemplateColumns: 'auto 1fr', alignItems: 'center', columnGap: 10 }}>
           <span className="dot live" />
-          <span><b>{ds.source.label}</b><br /><span style={{ color: 'var(--ink-3)' }}>{ds.source.kind === 'simulado' ? 'Modelo de gravedad con efectos de cada día laborable.' : `${fmt(ds.DAYTOT.reduce((a, b) => a + b, 0))} desplazamientos entre barrios en la semana.`}</span></span>
+          <span><b>{ds.source.label}</b><br /><span style={{ color: 'var(--ink-3)' }}>{
+            dataState === 'loading' ? 'Cargando…'
+              : ds.source.kind === 'simulado' ? 'Modelo de gravedad (no se encontraron los datos reales).'
+                : ds.source.kind === 'real' ? `Media de cada día laborable: ${ds.source.nDays.map((n, k) => `${n} ${DAYS[k].short.toLowerCase()}`).join(', ')}.`
+                  : `${fmt(ds.DAYTOT.reduce((a, b) => a + b, 0))} viajes entre barrios en la semana.`
+          }</span></span>
         </div>
       </section>
+
+      {dataState !== 'csv' && dataState !== 'error' && (
+        <section>
+          <div className="section-title"><h3>Periodo</h3><span>media de lunes a viernes</span></div>
+          <div className="clock" style={{ minWidth: 0 }}><PeriodSelect id="period-panel" /></div>
+          <div className="section-title" style={{ marginTop: 16 }}><h3>Tipo de viajero</h3></div>
+          <Segmented id="segment" label="Tipo de viajero" value={segment} onChange={setSegment} options={SEGMENTS.map((s) => ({ value: s.value, label: s.label }))} />
+          <p className="note" style={{ marginTop: 8 }}>{SEGMENTS.find((s) => s.value === segment)?.long}. Para estudiar la burbuja de los vecinos, usa «Residentes».</p>
+        </section>
+      )}
+
+      {dataState === 'csv' && csv?.segments.length > 1 && (
+        <section>
+          <div className="section-title"><h3>Tipo de viajero</h3><span>{csv.label}</span></div>
+          <Segmented id="segment-csv" label="Tipo de viajero" value={segment} onChange={setSegment} options={[{ value: 'all', label: 'Todos' }, ...csv.segments.map((v) => ({ value: v, label: SEGMENTS.find((s) => s.value === v)?.label || v }))]} />
+          <p className="note" style={{ marginTop: 8 }}>{segment === 'all' ? 'Todos los viajeros' : segmentLabel(segment)}.</p>
+        </section>
+      )}
 
       <section>
         <div
@@ -89,8 +122,8 @@ export default function DataPanel() {
           onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files?.[0]) }}
         >
           <FileUp />
-          <b>{busy ? 'Leyendo el archivo…' : 'Arrastra aquí tu CSV'}</b>
-          <small>Flujos (origen, destino, día, hora, personas) o atributos (barrio, población, restaurantes)</small>
+          <b>{busy ? `Leyendo el archivo… ${Math.round(progress * 100)} %` : 'Arrastra aquí tu CSV'}</b>
+          <small>Flujos (origen, destino, día, viajes) — también los ficheros mensuales originales — o atributos (barrio, población, restaurantes)</small>
           <input ref={input} type="file" accept=".csv,.txt,.tsv" hidden onChange={(e) => { handle(e.target.files?.[0]); e.target.value = '' }} />
         </div>
       </section>
@@ -107,15 +140,16 @@ export default function DataPanel() {
                   <span className="ok" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Check width={15} height={15} /> {fmt(report.used)} de {fmt(report.rows)} filas usadas</span>
                   {report.kind === 'flows' && (
                     <>
-                      <span>Días con datos: {[...report.days].sort().map((d) => DAYS[d].short).join(', ') || '—'} · horas: {report.hours.size}</span>
-                      {report.weeksAveraged > 1 && <span>Se han promediado {report.weeksAveraged} semanas por día laborable.</span>}
+                      <span>Días con datos: {[...report.days].sort().map((d) => DAYS[d].short).join(', ') || '—'}</span>
+                      {report.segments?.length > 0 && <span>Tipos de viajero: {report.segments.join(', ')}.</span>}
+                      {report.weeksAveraged > 1 && <span>Se han promediado hasta {report.weeksAveraged} fechas por día laborable.</span>}
                       {report.weekend > 0 && <span>{fmt(report.weekend)} filas de fin de semana no se usan.</span>}
                       {report.invalid > 0 && <span className="bad">{fmt(report.invalid)} filas con día, hora o cantidad no válidos.</span>}
                     </>
                   )}
                   {report.unmatched?.size > 0 && (
                     <span className="bad">
-                      Barrios sin reconocer: {[...report.unmatched.entries()].slice(0, 6).map(([n, c]) => `${n} (${c})`).join(', ')}{report.unmatched.size > 6 ? '…' : ''}. Usa el nombre oficial o el código 1–73.
+                      Barrios sin reconocer: {[...report.unmatched.entries()].slice(0, 6).map(([n, c]) => `${n} (${c})`).join(', ')}{report.unmatched.size > 6 ? '…' : ''}. Usa el nombre oficial o el código (1–73 u 080190101).
                     </span>
                   )}
                 </>
@@ -130,7 +164,7 @@ export default function DataPanel() {
         <div style={{ display: 'grid', gap: 8 }}>
           <button className="btn" onClick={() => download('plantilla-flujos.csv', TEMPLATE_CSV)}><Download /> Plantilla de flujos</button>
           <button className="btn" onClick={() => download('plantilla-atributos.csv', ATTR_TEMPLATE_CSV)}><Download /> Plantilla de atributos</button>
-          {ds !== SIMULATED && <button className="btn ghost" onClick={() => { resetDataset(); toast('De vuelta a los datos simulados.') }}><RotateCcw /> Volver a los datos simulados</button>}
+          {(dataState === 'csv' || report) && <button className="btn ghost" onClick={() => { resetDataset(); toast('De vuelta a los datos reales.') }}><RotateCcw /> Volver a los datos reales</button>}
         </div>
       </section>
 
@@ -138,7 +172,7 @@ export default function DataPanel() {
         <div className="section-title"><h3>Exportar</h3></div>
         <div style={{ display: 'grid', gap: 8 }}>
           <button className="btn" onClick={exportMetrics}><Download /> Métricas de los 73 barrios</button>
-          <button className="btn" onClick={() => { download('flujos-semana.csv', flowsToCsv(ds, 10)); toast('Flujos exportados (filas con 10 personas o más).') }}><Download /> Flujos de toda la semana</button>
+          <button className="btn" onClick={() => { download('flujos-semana.csv', flowsToCsv(ds, 10)); toast('Flujos exportados (filas con 10 viajes o más).') }}><Download /> Flujos de lunes a viernes</button>
         </div>
       </section>
 
@@ -146,8 +180,8 @@ export default function DataPanel() {
         <p className="note" style={{ display: 'flex', gap: 8 }}>
           <Info width={15} height={15} style={{ flex: 'none', marginTop: 1 }} />
           <span>
-            El día puede ser un nombre (lunes, dl, monday), un número (1 = lunes) o una fecha; si el archivo cubre varias semanas, se promedian.
-            La hora acepta 8, «08:00» o «08:00-09:00». Los barrios se reconocen por nombre (con o sin artículo) o por código oficial.
+            Los datos reales vienen ya procesados (script <code>scripts/preprocess-mobility.mjs</code>). Para importar un CSV propio: el día puede ser un nombre (lunes, dl, monday),
+            un número (1 = lunes) o una fecha; si cubre varias semanas, se promedian. No se usan horas. Los barrios se reconocen por nombre (con o sin artículo) o por código oficial.
           </span>
         </p>
       </section>

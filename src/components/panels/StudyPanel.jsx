@@ -37,15 +37,23 @@ export default function StudyPanel() {
 
   return (
     <>
+      {!ds.hasStays && (
+        <section>
+          <p className="report bad" style={{ margin: 0 }}>
+            Sin datos para la burbuja: los ficheros de movilidad solo registran viajes entre barrios distintos (ninguno empieza y acaba en el mismo barrio),
+            así que este índice sale 0 % en todos los barrios. Falta decidir cómo definirla con estos datos.
+          </p>
+        </section>
+      )}
       <section>
         <Segmented id="scope" label="Periodo" value={scope} onChange={setScope} options={[{ value: 'day', label: `${DAYS[day].name}` }, { value: 'week', label: 'Media L–V' }]} />
         <div style={{ marginTop: 12 }}>
-          <Scatter xs={xs} ys={ys} reg={reg} sel={sel} hover={hover} onHover={hoverIt} onPick={(i) => selectBarrio(i)} xLabel="Restaurantes por 1.000 habitantes" yLabel="Viajes de 20 a 24 h que se quedan en el barrio" />
+          <Scatter xs={xs} ys={ys} reg={reg} sel={sel} hover={hover} onHover={hoverIt} onPick={(i) => selectBarrio(i)} xLabel="Restaurantes por 1.000 habitantes" yLabel="Viajes que no salen del barrio" />
         </div>
         <motion.p key={`${scope}${day}`} className="note" style={{ color: 'var(--ink-2)', fontSize: 13, lineHeight: 1.5 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           Relación <b style={{ color: 'var(--ink)' }}>{st.s} y {st.dir}</b> (r = {reg.r.toLocaleString('es-ES', { maximumFractionDigits: 2 })}).
           {Math.abs(reg.r) >= 0.2 && (reg.r > 0
-            ? ` Por cada 5 restaurantes más por 1.000 habitantes, se queda en el barrio un ${Math.round(reg.slope * 5 * 100)} % más de los viajes nocturnos.`
+            ? ` Por cada 5 restaurantes más por 1.000 habitantes, se queda en el barrio un ${Math.round(reg.slope * 5 * 100)} % más de los viajes.`
             : ' Los barrios con más oferta retienen menos a su gente: atraen a la de fuera.')}
         </motion.p>
       </section>
@@ -81,8 +89,9 @@ export default function StudyPanel() {
 
       <section>
         <p className="note">
-          <b>Índice de burbuja:</b> de todos los viajes que salen de un barrio entre las 20 y las 24 h, la parte que termina dentro del mismo barrio.
-          Los restaurantes por habitante son {ds.source.kind === 'simulado' ? 'una estimación simulada' : 'los del fichero que has importado o la estimación por defecto'}; cárgalos reales desde el panel Datos.
+          <b>Índice de burbuja:</b> de todos los viajes que empiezan en un barrio ese día, la parte que termina dentro del mismo barrio.
+          Los datos de movilidad son diarios (no hay horas), así que la burbuja se calcula con el día completo.
+          Los restaurantes por habitante son una estimación por defecto salvo que cargues los reales (CSV de atributos) desde el panel Datos.
         </p>
       </section>
     </>

@@ -35,12 +35,3 @@ export const rampAt = (ramp, v) => {
 
 // One colour per district, drawn from the same mineral family (used in chord + scatter).
 export const DISTRICT_COLORS = ['#000000', '#C985B6', '#E2C08A', '#E79A84', '#8EA2EA', '#5FBFAE', '#D7A6C9', '#9BC7A0', '#7FA7C9', '#C9B38A', '#A39BD9']
-
-export const hueForTime = (t) => {
-  const d = Math.floor(((t % 120) + 120) % 120 / 24)
-  const h = t % 24
-  const next = d === 4 ? 4 : d + 1
-  const w = h > 23 ? (h - 23) : 0
-  const s = w * w * (3 - 2 * w)
-  return mix(hexToRgb(DAYS[d].hue), hexToRgb(DAYS[next].hue), s)
-}

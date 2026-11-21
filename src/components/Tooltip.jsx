@@ -2,11 +2,11 @@ import { useStore } from '../store.js'
 import { BARRIOS } from '../model/geo.js'
 import { DAYS } from '../lib/colors.js'
 import { fmt, pct } from '../lib/format.js'
-import { dayOf, clockText } from '../lib/week.js'
+import { dayOf } from '../lib/week.js'
 
 export default function Tooltip() {
   const hover = useStore((s) => s.hover)
-  const tq = useStore((s) => Math.floor(s.t * 4) / 4)
+  const d = useStore((s) => dayOf(s.t))
   const ds = useStore((s) => s.dataset)
   const mode = useStore((s) => s.colorMode)
   const sel = useStore((s) => s.sel)
@@ -30,13 +30,11 @@ export default function Tooltip() {
   const i = hover.i
   if (i == null || i < 0) return null
   const b = BARRIOS[i]
-  const d = dayOf(tq)
-  const t0 = Math.floor(tq)
-  const arr = ds.ARR[t0][i]
-  const dep = ds.DEP[t0][i]
+  const arr = ds.ARR[d][i]
+  const dep = ds.DEP[d][i]
   let share = null
   if (mode === 'influence' && sel >= 0) {
-    const Ft = ds.F[t0]
+    const Ft = ds.F[d]
     let tot = 0
     for (let j = 0; j < 73; j++) tot += dir === 'in' ? Ft[j * 73 + sel] : Ft[sel * 73 + j]
     const v = dir === 'in' ? Ft[i * 73 + sel] : Ft[sel * 73 + i]
@@ -47,8 +45,8 @@ export default function Tooltip() {
       <p className="eyebrow" style={{ margin: 0 }}>{b.district}</p>
       <h4>{b.name}</h4>
       {share != null && <div className="r"><span>{dir === 'in' ? `Hacia ${BARRIOS[sel].short}` : `Desde ${BARRIOS[sel].short}`}</span><b>{pct(share, 1)}</b></div>}
-      <div className="r"><span>Llegan · {DAYS[d].short} {clockText(tq)}</span><b>{fmt(arr)}/h</b></div>
-      <div className="r"><span>Salen</span><b>{fmt(dep)}/h</b></div>
+      <div className="r"><span>Llegan · {DAYS[d].name.toLowerCase()}</span><b>{fmt(arr)}</b></div>
+      <div className="r"><span>Salen</span><b>{fmt(dep)}</b></div>
       <div className="r"><span>Burbuja del {DAYS[d].name.toLowerCase()}</span><b>{pct(ds.metrics[i].bub[d])}</b></div>
       <div className="r" style={{ marginTop: 4 }}><span>{ds.metrics[i].tag.label}</span><b style={{ fontFamily: 'var(--font-ui)', fontWeight: 400, color: 'var(--ink-3)' }}>clic para la ficha</b></div>
     </div>

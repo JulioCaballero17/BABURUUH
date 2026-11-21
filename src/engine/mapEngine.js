@@ -7,7 +7,7 @@ import { useStore, selectDark } from '../store.js'
 import { buildStyle, rampExpr } from './mapStyle.js'
 import { buildDeckLayers, buildTrips } from './deckLayers.js'
 import { BARRIOS, N, HEXES } from '../model/geo.js'
-import { HOURS } from '../model/simulate.js'
+import { STEPS } from '../model/simulate.js'
 import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, hexToRgb, mix, rgbStr } from '../lib/colors.js'
 import { sunAt, dayOf } from '../lib/week.js'
 import { clamp, smoothstep } from '../lib/format.js'
@@ -289,8 +289,8 @@ function applyLighting(sun, s) {
 
 /* ------------------------------------------------------------------ per-frame data → feature state */
 function interp(series, t) {
-  const t0 = Math.floor(t) % HOURS
-  const t1 = (t0 + 1) % HOURS
+  const t0 = ((Math.floor(t) % STEPS) + STEPS) % STEPS
+  const t1 = (t0 + 1) % STEPS
   const f = t - Math.floor(t)
   return [series[t0], series[t1], f]
 }
@@ -315,8 +315,7 @@ function updateBarrios(s, t, grow) {
   let bMin = 1
   let bMax = 0
   if (mode === 'bubble') ds.metrics.forEach((m) => { bMin = Math.min(bMin, m.bub[day]); bMax = Math.max(bMax, m.bub[day]) })
-  const baseT = s.deltaBase * 24 + (t % 24)
-  const [R0, R1, rf] = interp(ds.DENS, baseT)
+  const [R0, R1, rf] = interp(ds.DENS, s.deltaBase)
   const hov = s.hover?.i ?? -1
   for (let i = 0; i < N; i++) {
     const dens = D0[i] * (1 - f) + D1[i] * f
@@ -347,7 +346,7 @@ function updateHex(s, t, grow) {
   const delta = s.colorMode === 'delta'
   let ref = null
   if (delta) {
-    const [R0, R1, rf] = interp(ds.DENS, s.deltaBase * 24 + (t % 24))
+    const [R0, R1, rf] = interp(ds.DENS, s.deltaBase)
     ref = new Float32Array(N)
     for (let i = 0; i < N; i++) ref[i] = R0[i] * (1 - rf) + R1[i] * rf
   }
@@ -374,14 +373,24 @@ function advanceTime(s, now, dt) {
     const k = e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2
     const t = s.tween.from + (s.tween.to - s.tween.from) * k
     useStore.setState(e >= 1 ? { t: s.tween.to, tween: null } : { t })
+    E.phase = null
   } else if (s.playing) {
-    let t = s.t + dt * s.speed
-    if (t >= HOURS) {
-      if (s.loop) t -= HOURS
-      else { t = HOURS - 0.01; useStore.setState({ playing: false }) }
+    // hold each day, then glide to the next one during the last quarter of its slot
+    if (E.phase == null || Math.abs(eased(E.phase) - s.t) > 0.01) E.phase = s.t
+    E.phase += dt * s.speed
+    if (E.phase >= STEPS) {
+      if (s.loop) E.phase -= STEPS
+      else { E.phase = STEPS - 1; useStore.setState({ playing: false }) }
     }
-    useStore.setState({ t })
+    useStore.setState({ t: eased(E.phase) })
+  } else {
+    E.phase = null
   }
+}
+function eased(phase) {
+  const d = Math.floor(phase)
+  const k = smoothstep((phase - d - 0.75) / 0.25)
+  return (d + k) % STEPS
 }
 
 function frame(now) {
