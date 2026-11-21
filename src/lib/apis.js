@@ -20,7 +20,6 @@ export async function fetchWeather() {
   end.setDate(end.getDate() + 4)
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${BCN.lat}&longitude=${BCN.lng}` +
     `&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m,is_day` +
-    `&hourly=temperature_2m,weather_code,precipitation_probability` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
     `&timezone=Europe%2FMadrid&start_date=${iso(start)}&end_date=${iso(end)}`
   const res = await fetch(url)
@@ -33,15 +32,9 @@ export async function fetchWeather() {
     min: j.daily.temperature_2m_min[k],
     rain: j.daily.precipitation_probability_max?.[k] ?? null,
   }))
-  const hourly = (j.hourly?.time || []).slice(0, 120).map((t, k) => ({
-    temp: j.hourly.temperature_2m[k],
-    code: j.hourly.weather_code[k],
-    rain: j.hourly.precipitation_probability?.[k] ?? null,
-  }))
   return {
     current: j.current ? { temp: j.current.temperature_2m, code: j.current.weather_code, wind: j.current.wind_speed_10m, humidity: j.current.relative_humidity_2m, isDay: j.current.is_day } : null,
     days,
-    hourly,
     fetchedAt: Date.now(),
   }
 }

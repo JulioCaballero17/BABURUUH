@@ -1,0 +1,479 @@
+{
+ "generated": "2026-11-12T15:31:09.850Z",
+ "segments": [
+  "Residente",
+  "Regional",
+  "Nacional",
+  "Internacional"
+ ],
+ "periods": [
+  {
+   "id": "all",
+   "label": "Todos los meses",
+   "kind": "all",
+   "file": "all.json",
+   "nDays": [
+    139,
+    138,
+    139,
+    139,
+    139
+   ]
+  },
+  {
+   "id": "2023",
+   "label": "Año 2023",
+   "kind": "year",
+   "file": "2023.json",
+   "nDays": [
+    52,
+    52,
+    52,
+    52,
+    52
+   ]
+  },
+  {
+   "id": "2024",
+   "label": "Año 2024",
+   "kind": "year",
+   "file": "2024.json",
+   "nDays": [
+    53,
+    53,
+    52,
+    52,
+    52
+   ]
+  },
+  {
+   "id": "2025",
+   "label": "Año 2025",
+   "kind": "year",
+   "file": "2025.json",
+   "nDays": [
+    34,
+    33,
+    35,
+    35,
+    35
+   ]
+  },
+  {
+   "id": "2023-01",
+   "label": "Enero 2023",
+   "kind": "month",
+   "file": "2023-01.json",
+   "nDays": [
+    5,
+    5,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-02",
+   "label": "Febrero 2023",
+   "kind": "month",
+   "file": "2023-02.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-03",
+   "label": "Marzo 2023",
+   "kind": "month",
+   "file": "2023-03.json",
+   "nDays": [
+    4,
+    4,
+    5,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2023-04",
+   "label": "Abril 2023",
+   "kind": "month",
+   "file": "2023-04.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-05",
+   "label": "Mayo 2023",
+   "kind": "month",
+   "file": "2023-05.json",
+   "nDays": [
+    5,
+    5,
+    5,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-06",
+   "label": "Junio 2023",
+   "kind": "month",
+   "file": "2023-06.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2023-07",
+   "label": "Julio 2023",
+   "kind": "month",
+   "file": "2023-07.json",
+   "nDays": [
+    5,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-08",
+   "label": "Agosto 2023",
+   "kind": "month",
+   "file": "2023-08.json",
+   "nDays": [
+    4,
+    5,
+    5,
+    5,
+    4
+   ]
+  },
+  {
+   "id": "2023-09",
+   "label": "Septiembre 2023",
+   "kind": "month",
+   "file": "2023-09.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  },
+  {
+   "id": "2023-10",
+   "label": "Octubre 2023",
+   "kind": "month",
+   "file": "2023-10.json",
+   "nDays": [
+    5,
+    5,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2023-11",
+   "label": "Noviembre 2023",
+   "kind": "month",
+   "file": "2023-11.json",
+   "nDays": [
+    4,
+    4,
+    5,
+    5,
+    4
+   ]
+  },
+  {
+   "id": "2023-12",
+   "label": "Diciembre 2023",
+   "kind": "month",
+   "file": "2023-12.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  },
+  {
+   "id": "2024-01",
+   "label": "Enero 2024",
+   "kind": "month",
+   "file": "2024-01.json",
+   "nDays": [
+    5,
+    5,
+    5,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2024-02",
+   "label": "Febrero 2024",
+   "kind": "month",
+   "file": "2024-02.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    5,
+    4
+   ]
+  },
+  {
+   "id": "2024-03",
+   "label": "Marzo 2024",
+   "kind": "month",
+   "file": "2024-03.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  },
+  {
+   "id": "2024-04",
+   "label": "Abril 2024",
+   "kind": "month",
+   "file": "2024-04.json",
+   "nDays": [
+    5,
+    5,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2024-05",
+   "label": "Mayo 2024",
+   "kind": "month",
+   "file": "2024-05.json",
+   "nDays": [
+    4,
+    4,
+    5,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2024-06",
+   "label": "Junio 2024",
+   "kind": "month",
+   "file": "2024-06.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2024-07",
+   "label": "Julio 2024",
+   "kind": "month",
+   "file": "2024-07.json",
+   "nDays": [
+    5,
+    5,
+    5,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2024-08",
+   "label": "Agosto 2024",
+   "kind": "month",
+   "file": "2024-08.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2024-09",
+   "label": "Septiembre 2024",
+   "kind": "month",
+   "file": "2024-09.json",
+   "nDays": [
+    5,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2024-10",
+   "label": "Octubre 2024",
+   "kind": "month",
+   "file": "2024-10.json",
+   "nDays": [
+    4,
+    5,
+    5,
+    5,
+    4
+   ]
+  },
+  {
+   "id": "2024-11",
+   "label": "Noviembre 2024",
+   "kind": "month",
+   "file": "2024-11.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  },
+  {
+   "id": "2024-12",
+   "label": "Diciembre 2024",
+   "kind": "month",
+   "file": "2024-12.json",
+   "nDays": [
+    5,
+    5,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2025-01",
+   "label": "Enero 2025",
+   "kind": "month",
+   "file": "2025-01.json",
+   "nDays": [
+    4,
+    4,
+    5,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2025-02",
+   "label": "Febrero 2025",
+   "kind": "month",
+   "file": "2025-02.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2025-03",
+   "label": "Marzo 2025",
+   "kind": "month",
+   "file": "2025-03.json",
+   "nDays": [
+    5,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2025-04",
+   "label": "Abril 2025",
+   "kind": "month",
+   "file": "2025-04.json",
+   "nDays": [
+    4,
+    5,
+    5,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2025-05",
+   "label": "Mayo 2025",
+   "kind": "month",
+   "file": "2025-05.json",
+   "nDays": [
+    4,
+    3,
+    4,
+    5,
+    5
+   ]
+  },
+  {
+   "id": "2025-06",
+   "label": "Junio 2025",
+   "kind": "month",
+   "file": "2025-06.json",
+   "nDays": [
+    5,
+    4,
+    4,
+    4,
+    4
+   ]
+  },
+  {
+   "id": "2025-07",
+   "label": "Julio 2025",
+   "kind": "month",
+   "file": "2025-07.json",
+   "nDays": [
+    4,
+    5,
+    5,
+    5,
+    4
+   ]
+  },
+  {
+   "id": "2025-08",
+   "label": "Agosto 2025",
+   "kind": "month",
+   "file": "2025-08.json",
+   "nDays": [
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  }
+ ]
+}

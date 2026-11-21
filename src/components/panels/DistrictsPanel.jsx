@@ -6,7 +6,7 @@ import { districtMatrix } from '../../model/derive.js'
 import { DISTRICTS, DISTRICT_SHORT } from '../../data/attributes.js'
 import { DISTRICT_COLORS } from '../../lib/colors.js'
 import { fmt, fmtK, pct } from '../../lib/format.js'
-import { clockText, dayName } from '../../lib/week.js'
+import { dayName, dayOf } from '../../lib/week.js'
 
 const SIZE = 320
 const R = SIZE / 2 - 30
@@ -14,7 +14,7 @@ const IR = R - 12
 
 export default function DistrictsPanel() {
   const ds = useStore((s) => s.dataset)
-  const th = useStore((s) => Math.floor(s.t))
+  const th = useStore((s) => dayOf(s.t))
   const [focus, setFocus] = useState(-1)
 
   const { chords, M, inner, total, pairs } = useMemo(() => {
@@ -35,8 +35,8 @@ export default function DistrictsPanel() {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span className="serif" style={{ fontSize: 22, fontStyle: 'italic' }}>{dayName(th)}, {clockText(th)}</span>
-        <span className="note">{fmtK(total - inner)} personas/h entre distritos</span>
+        <span className="serif" style={{ fontSize: 22, fontStyle: 'italic' }}>{dayName(th)}</span>
+        <span className="note">{fmtK(total - inner)} viajes/día entre distritos</span>
       </div>
       <svg viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`} width="100%" role="img" aria-label="Diagrama de cuerdas de los flujos entre distritos" onPointerLeave={() => setFocus(-1)}>
         {chords.map((c, k) => {
@@ -72,7 +72,7 @@ export default function DistrictsPanel() {
         })}
       </svg>
       <section>
-        <div className="section-title"><h3>{focus >= 0 ? DISTRICTS[focus + 1] : 'Conexiones más fuertes'}</h3><span>personas/h</span></div>
+        <div className="section-title"><h3>{focus >= 0 ? DISTRICTS[focus + 1] : 'Conexiones más fuertes'}</h3><span>viajes/día</span></div>
         <div className="bars">
           {(focus >= 0
             ? M[focus].map((v, b) => ({ a: focus, b, v })).filter((o) => o.v > 0).sort((x, y) => y.v - x.v).slice(0, 6)
@@ -86,7 +86,7 @@ export default function DistrictsPanel() {
           ))}
         </div>
       </section>
-      <p className="note">Pasa el cursor por un distrito para aislar sus flujos. Los viajes dentro de un mismo distrito ({pct(total ? inner / total : 0)} del total a esta hora) no se dibujan.</p>
+      <p className="note">Pasa el cursor por un distrito para aislar sus flujos. Los viajes dentro de un mismo distrito ({pct(total ? inner / total : 0)} del total ese día) no se dibujan.</p>
     </>
   )
 }

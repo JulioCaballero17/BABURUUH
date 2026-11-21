@@ -6,7 +6,7 @@ import { BARRIOS } from '../model/geo.js'
 import { topFrom, topTo } from '../model/derive.js'
 import { DAYS } from '../lib/colors.js'
 import { fmt, fmtK, pct, signedPct } from '../lib/format.js'
-import { dayOf, clockText } from '../lib/week.js'
+import { dayOf } from '../lib/week.js'
 import { dnaAxes } from '../lib/dna.js'
 import { selectBarrio, flyTo } from '../engine/mapEngine.js'
 import { AnimatedNumber, Segmented, stagger } from './ui/primitives.jsx'
@@ -21,9 +21,7 @@ const drawerMotion = {
 
 function Body({ i }) {
   const ds = useStore((s) => s.dataset)
-  const tq = useStore((s) => Math.floor(s.t * 4) / 4)
-  const th = Math.floor(tq)
-  const day = dayOf(tq)
+  const day = useStore((s) => dayOf(s.t))
   const goTo = useStore((s) => s.goTo)
   const openCompare = useStore((s) => s.openCompare)
   const setHover = useStore((s) => s.setHover)
@@ -36,10 +34,10 @@ function Body({ i }) {
 
   const series = useMemo(() => ds.ARR.map((a) => a[i]), [ds, i])
   const axes = useMemo(() => dnaAxes(ds, i), [ds, i])
-  const arrNow = ds.ARR[th][i] * (1 - (tq - th)) + ds.ARR[(th + 1) % 120][i] * (tq - th)
-  const arrMon = ds.ARR[th % 24][i]
-  const list = dir === 'out' ? topFrom(ds, i, th, 5) : topTo(ds, i, th, 5)
-  const Ft = ds.F[th]
+  const arrNow = ds.ARR[day][i]
+  const arrMon = ds.ARR[0][i]
+  const list = dir === 'out' ? topFrom(ds, i, day, 5) : topTo(ds, i, day, 5)
+  const Ft = ds.F[day]
   let outTot = 0
   for (let j = 0; j < 73; j++) outTot += dir === 'out' ? Ft[i * 73 + j] : Ft[j * 73 + i]
   const stay = Ft[i * 73 + i]
@@ -78,7 +76,7 @@ function Body({ i }) {
         <div className="kpis">
           <motion.div className="kpi" {...stagger(0)}>
             <div className="v"><AnimatedNumber value={arrNow} format={fmtK} /></div>
-            <div className="l">llegadas/h ahora</div>
+            <div className="l">llegadas el {DAYS[day].name.toLowerCase()}</div>
             {day > 0 && arrMon > 0 && <div className="d" style={{ color: arrNow >= arrMon ? 'var(--good)' : 'var(--warn)' }}>{signedPct(arrNow / arrMon - 1)} vs lunes</div>}
           </motion.div>
           <motion.div className="kpi" {...stagger(1)}>
@@ -87,21 +85,21 @@ function Body({ i }) {
             <div className="d" style={{ color: 'var(--ink-3)' }}>ciudad {pct(ds.cityBub[day])}</div>
           </motion.div>
           <motion.div className="kpi" {...stagger(2)}>
-            <div className="v">{DAYS[Math.floor(m.peak / 24)].short} {m.peak % 24}h</div>
-            <div className="l">pico de la semana</div>
-            <div className="d" style={{ color: 'var(--ink-3)' }}>{fmtK(m.max)}/h</div>
+            <div className="v">{DAYS[m.peak].name}</div>
+            <div className="l">día con más llegadas</div>
+            <div className="d" style={{ color: 'var(--ink-3)' }}>{fmtK(m.max)}</div>
           </motion.div>
         </div>
 
         <section>
-          <div className="section-title"><h3>La semana, hora a hora</h3><span>toca una celda</span></div>
-          <WeekHeatmap series={series} current={th} onPick={(t) => goTo(t + 0.5, 900)} label={`Llegadas a ${b.name} cada hora de lunes a viernes`} />
+          <div className="section-title"><h3>Llegadas, día a día</h3><span>toca un día</span></div>
+          <WeekHeatmap series={series} current={day} onPick={(d) => goTo(d, 900)} label={`Llegadas a ${b.name} cada día de lunes a viernes`} />
         </section>
 
         <section>
           <div className="section-title">
             <h3>{dir === 'out' ? 'Adónde va su gente' : 'De dónde viene'}</h3>
-            <span>{DAYS[day].short} {clockText(tq)}</span>
+            <span>{DAYS[day].name}</span>
           </div>
           <Segmented id="dir-drawer" label="Dirección" value={dir} onChange={setDir} options={[{ value: 'out', label: 'Salidas' }, { value: 'in', label: 'Llegadas' }]} />
           <div className="bars" style={{ marginTop: 12 }}>
@@ -121,7 +119,7 @@ function Body({ i }) {
         </section>
 
         <section>
-          <div className="section-title"><h3>Burbuja por día · 20–24 h</h3></div>
+          <div className="section-title"><h3>Burbuja por día</h3><span>{ds.hasStays ? 'viajes que no salen del barrio' : 'sin datos de viajes dentro del barrio'}</span></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, alignItems: 'end', height: 96 }}>
             {m.bub.map((v, k) => {
               const mx = Math.max(...m.bub, ...ds.cityBub) || 1

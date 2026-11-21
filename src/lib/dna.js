@@ -8,11 +8,11 @@ export function dnaAxes(ds, i) {
   const norm = (vals, v) => { const mx = Math.max(...vals); const mn = Math.min(...vals); return mx > mn ? (v - mn) / (mx - mn) : 0 }
   const traits = [
     ['Atracción', M.map((m) => m.weekArr / (BARRIOS[m.i].area + 0.3))],
-    ['Noche', M.map((m) => m.nightRatio)],
+    ['Visitantes', M.map((m) => m.visitorShare)],
     ['Burbuja', M.map((m) => m.bubAvg)],
     ['Efecto viernes', M.map((m) => m.friE)],
     ['Restaurantes', ds.rest],
-    ['Madrugadores', M.map((m) => (m.mornOut + 1) / (m.mornIn + 1))],
+    ['Movilidad', M.map((m) => m.tripsPerRes)],
   ]
   return traits.map(([label, vals]) => {
     const scaled = vals.map((v) => norm(vals, v))

@@ -18,14 +18,14 @@ function WeekLines({ a, b, current }) {
   const H = 210
   const m = { l: 44, r: 10, t: 14, b: 26 }
   const max = Math.max(...a, ...b) || 1
-  const X = (t) => m.l + (t / 119) * (W - m.l - m.r)
+  const X = (t) => m.l + ((t + 0.5) / 5) * (W - m.l - m.r)
   const Y = (v) => H - m.b - (v / max) * (H - m.t - m.b)
   const path = (s) => s.map((v, t) => `${t ? 'L' : 'M'}${X(t).toFixed(1)},${Y(v).toFixed(1)}`).join('')
-  const area = (s) => `${path(s)}L${X(119)},${H - m.b}L${X(0)},${H - m.b}Z`
+  const area = (s) => `${path(s)}L${X(4)},${H - m.b}L${X(0)},${H - m.b}Z`
   const [hv, setHv] = useState(-1)
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Llegadas por hora de los dos barrios de lunes a viernes"
-      onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width) * W; setHv(Math.max(0, Math.min(119, Math.round(((x - m.l) / (W - m.l - m.r)) * 119)))) }}
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Llegadas por día de los dos barrios de lunes a viernes"
+      onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width) * W; setHv(Math.max(0, Math.min(4, Math.floor(((x - m.l) / (W - m.l - m.r)) * 5)))) }}
       onPointerLeave={() => setHv(-1)}>
       <g className="axis">
         {[0.25, 0.5, 0.75, 1].map((q) => (
@@ -33,8 +33,8 @@ function WeekLines({ a, b, current }) {
         ))}
         {DAYS.map((d, k) => (
           <g key={d.key}>
-            {k > 0 && <line x1={X(k * 24)} x2={X(k * 24)} y1={m.t} y2={H - m.b} />}
-            <text x={X(k * 24 + 12)} y={H - 8} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 14, fill: d.hue }}>{d.name}</text>
+            {k > 0 && <line x1={X(k - 0.5)} x2={X(k - 0.5)} y1={m.t} y2={H - m.b} />}
+            <text x={X(k)} y={H - 8} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 14, fill: d.hue }}>{d.name}</text>
           </g>
         ))}
       </g>
@@ -43,13 +43,15 @@ function WeekLines({ a, b, current }) {
       <motion.path d={path(a)} fill="none" stroke={CA} strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} />
       <motion.path d={path(b)} fill="none" stroke={CB} strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, delay: 0.15, ease: [0.16, 1, 0.3, 1] }} />
       <line x1={X(current)} x2={X(current)} y1={m.t} y2={H - m.b} stroke="var(--ink)" strokeWidth="1.5" />
+      {a.map((v, t) => <circle key={`a${t}`} cx={X(t)} cy={Y(v)} r="3.5" fill={CA} />)}
+      {b.map((v, t) => <circle key={`b${t}`} cx={X(t)} cy={Y(v)} r="3.5" fill={CB} />)}
       {hv >= 0 && (
         <g>
           <line x1={X(hv)} x2={X(hv)} y1={m.t} y2={H - m.b} stroke="var(--ink-3)" />
           <circle cx={X(hv)} cy={Y(a[hv])} r="4" fill={CA} />
           <circle cx={X(hv)} cy={Y(b[hv])} r="4" fill={CB} />
           <text x={Math.min(X(hv) + 8, W - 150)} y={m.t + 10} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fill: 'var(--ink)' }}>
-            {DAYS[Math.floor(hv / 24)].short} {hv % 24}h · {fmt(a[hv])} / {fmt(b[hv])}
+            {DAYS[hv].name} · {fmt(a[hv])} / {fmt(b[hv])}
           </text>
         </g>
       )}
@@ -80,7 +82,7 @@ export default function CompareModal() {
   const compareB = useStore((s) => s.compareB)
   const setCompareB = useStore((s) => s.setCompareB)
   const ds = useStore((s) => s.dataset)
-  const th = useStore((s) => Math.floor(s.t))
+  const th = useStore((s) => dayOf(s.t))
   const A = sel
 
   useEffect(() => {
@@ -100,8 +102,9 @@ export default function CompareModal() {
     const sb = ds.ARR.map((x) => x[B])
     let ab = 0
     let ba = 0
-    const d = dayOf(th)
-    for (let h = 0; h < 24; h++) { const F = ds.F[d * 24 + h]; ab += F[A * N + B]; ba += F[B * N + A] }
+    const d = th
+    ab = ds.F[d][A * N + B]
+    ba = ds.F[d][B * N + A]
     return { sa, sb, ab, ba, d, ra: dnaAxes(ds, A), rb: dnaAxes(ds, B) }
   }, [ds, A, B, th])
 
@@ -109,9 +112,9 @@ export default function CompareModal() {
     ['Habitantes', fmt(ds.pop[A] * 1000), fmt(ds.pop[B] * 1000)],
     ['Restaurantes por 1.000 hab.', ds.rest[A].toLocaleString('es-ES'), ds.rest[B].toLocaleString('es-ES')],
     ['Llegadas en la semana', fmtK(ds.metrics[A].weekArr), fmtK(ds.metrics[B].weekArr)],
-    ['Pico semanal', `${DAYS[Math.floor(ds.metrics[A].peak / 24)].short} ${ds.metrics[A].peak % 24}h`, `${DAYS[Math.floor(ds.metrics[B].peak / 24)].short} ${ds.metrics[B].peak % 24}h`],
-    ['Burbuja media 20–24 h', pct(ds.metrics[A].bubAvg), pct(ds.metrics[B].bubAvg)],
-    ['Viernes vs lunes (noche)', `${ds.metrics[A].friE >= 1 ? '+' : '−'}${Math.abs(Math.round((ds.metrics[A].friE - 1) * 100))} %`, `${ds.metrics[B].friE >= 1 ? '+' : '−'}${Math.abs(Math.round((ds.metrics[B].friE - 1) * 100))} %`],
+    ['Día con más llegadas', DAYS[ds.metrics[A].peak].name, DAYS[ds.metrics[B].peak].name],
+    ['Burbuja media L–V', pct(ds.metrics[A].bubAvg), pct(ds.metrics[B].bubAvg)],
+    ['Viernes vs lunes (llegadas)', `${ds.metrics[A].friE >= 1 ? '+' : '−'}${Math.abs(Math.round((ds.metrics[A].friE - 1) * 100))} %`, `${ds.metrics[B].friE >= 1 ? '+' : '−'}${Math.abs(Math.round((ds.metrics[B].friE - 1) * 100))} %`],
     ['Perfil', ds.metrics[A].tag.label, ds.metrics[B].tag.label],
   ]
 
@@ -141,7 +144,7 @@ export default function CompareModal() {
             </p>
 
             <div style={{ marginTop: 18 }}>
-              <div className="section-title"><h3>Llegadas por hora, lunes a viernes</h3><span>línea vertical: momento actual</span></div>
+              <div className="section-title"><h3>Llegadas por día, lunes a viernes</h3><span>línea vertical: día actual</span></div>
               <WeekLines a={data.sa} b={data.sb} current={th} />
             </div>
 
