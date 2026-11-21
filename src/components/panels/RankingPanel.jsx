@@ -38,7 +38,7 @@ export default function RankingPanel() {
 
   return (
     <>
-      <Segmented id="rank" label="Métrica" value={metric} onChange={setMetric} options={[{ value: 'arr', label: 'Llegan' }, { value: 'dep', label: 'Salen' }, { value: 'net', label: 'Saldo' }, { value: 'bub', label: 'Burbuja' }]} />
+      <Segmented id="rank" label="Métrica" value={metric} onChange={setMetric} options={[{ value: 'arr', label: 'Llegan' }, { value: 'dep', label: 'Salen' }, { value: 'net', label: 'Saldo' }, ...(ds.hasStays ? [{ value: 'bub', label: 'Burbuja' }] : [])]} />
       <p className="note" style={{ marginTop: -10 }}>
         {metric === 'arr' && 'Viajes que llegan al barrio el día seleccionado.'}
         {metric === 'dep' && 'Viajes que salen del barrio el día seleccionado.'}

@@ -4,6 +4,7 @@ import { fetchWeather, fetchBicing } from './lib/apis.js'
 import { writeHash } from './lib/url.js'
 import { getCamera, flyHome, getMap } from './engine/mapEngine.js'
 import { PANELS } from './components/Rail.jsx'
+import { downloadCapture } from './components/TopBar.jsx'
 
 const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"]')
 
@@ -22,20 +23,22 @@ export function useShortcuts() {
         else if (s.panel) s.setPanel(s.panel)
         return
       }
-      if (s.cmdk || s.compareOpen || s.help) return
+      if (s.cmdk || s.help) return
+      if (s.compareOpen && !s.story.active) return
       const onButton = e.target.closest?.('button, [role="slider"]')
       if (e.key === ' ' && !onButton) { e.preventDefault(); s.togglePlay(); return }
       if (/^[1-5]$/.test(e.key) && !s.story.active) { s.goDay(Number(e.key) - 1); return }
+      if (e.key.toLowerCase() === 't') { s.setStory({ active: !s.story.active, idx: 0 }); return }
       if (e.key === 'ArrowRight' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(1); return }
       if (e.key === 'ArrowLeft' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(-1); return }
       if (e.key === '/') { e.preventDefault(); s.setCmdk(true); return }
       if (e.key === '?') { s.setHelp(true); return }
       const k = e.key.toLowerCase()
       const p = PANELS.find((x) => x.kb.toLowerCase() === k)
-      if (p) { s.setPanel(p.key); return }
+      if (p && !s.story.active) { s.setPanel(p.key); return }
       if (k === 'o') s.setOrbit(!s.orbit)
       else if (k === 'h') flyHome()
-      else if (k === 'p') document.querySelector('[aria-label="Descargar captura del mapa"]')?.click()
+      else if (k === 'p') downloadCapture()
       else if (k === 'd') { if (s.colorMode === 'delta') s.setColorMode('activity'); else { s.setDeltaBase(0); s.setColorMode('delta') } }
       else if (k === 'c' && s.sel >= 0) s.openCompare()
     }
@@ -95,14 +98,4 @@ export function useHashSync() {
     attach()
     return () => { unsub(); clearTimeout(timer); getMap()?.off('moveend', push) }
   }, [])
-}
-
-// Keeps the accent colour of the interface on the current weekday.
-export function useDayAccent(dayHue) {
-  useEffect(() => {
-    const el = document.documentElement
-    el.style.setProperty('--day', dayHue)
-    const n = dayHue.replace('#', '')
-    el.style.setProperty('--day-rgb', `${parseInt(n.slice(0, 2), 16)}, ${parseInt(n.slice(2, 4), 16)}, ${parseInt(n.slice(4, 6), 16)}`)
-  }, [dayHue])
 }

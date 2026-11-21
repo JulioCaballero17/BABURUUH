@@ -1,27 +1,49 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Minus, Compass, Box, Orbit, Video } from 'lucide-react'
+import { Plus, Minus, Compass, Box, Orbit, Video, Info, ArrowUpFromLine } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
+import { visitorShares, shareRange } from '../model/derive.js'
 import { useStore } from '../store.js'
 import { zoomBy, resetNorth, togglePitch, getMap, flyPreset, PRESETS } from '../engine/mapEngine.js'
 import { legendFor } from '../lib/legend.js'
 
+export function useLegend() {
+  const st = useStore(useShallow((s) => ({
+    colorMode: s.colorMode, deltaBase: s.deltaBase, sel: s.sel, influenceDir: s.influenceDir, t: Math.round(s.t) % 5,
+    periods: s.periods, period: s.period, comparePeriod: s.comparePeriod, dataState: s.dataState, visitorKind: s.visitorKind, dataset: s.dataset,
+  })))
+  let visitorRange = null
+  if (st.colorMode === 'visitors') {
+    const sh = visitorShares(st.dataset, st.t, st.visitorKind)
+    if (sh) visitorRange = shareRange(sh, st.dataset, st.t)
+  }
+  return legendFor({ ...st, visitorRange })
+}
+
 function Legend() {
-  const colorMode = useStore((s) => s.colorMode)
-  const deltaBase = useStore((s) => s.deltaBase)
-  const sel = useStore((s) => s.sel)
-  const influenceDir = useStore((s) => s.influenceDir)
-  const lg = legendFor({ colorMode, deltaBase, sel, influenceDir })
+  const lg = useLegend()
   const bicing = useStore((s) => s.layers.bicing && s.bicing)
+  const barrios = useStore((s) => s.layers.barrios)
   return (
-    <motion.div className="legend glass" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 28 }}>
-      <div className="ttl"><span>{lg.title}</span></div>
-      <div className="bar" style={{ background: `linear-gradient(90deg, ${lg.ramp.join(',')})` }} />
-      <div className="ends"><span>{lg.min}</span><span>{lg.max}</span></div>
-      {lg.note && <div className="ends" style={{ marginTop: 6 }}><span>{lg.note}</span></div>}
+    <motion.div className="legend glass" data-tour="legend" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 28 }}>
+      <p className="eyebrow" style={{ marginBottom: 6 }}>Cómo leer el mapa</p>
+      <div className="ttl">{lg.title}</div>
+      {(lg.min || lg.max) && (
+        <>
+          <div className="bar" style={{ background: `linear-gradient(90deg, ${lg.ramp.join(',')})` }} />
+          <div className="ends"><span>{lg.min}</span>{lg.mid && <span>{lg.mid}</span>}<span>{lg.max}</span></div>
+        </>
+      )}
+      {lg.note && (
+        <div className="foot">
+          {barrios === '3d' && /Altura/.test(lg.note) ? <ArrowUpFromLine aria-hidden="true" /> : <Info aria-hidden="true" />}
+          <span>{lg.note}</span>
+        </div>
+      )}
       {bicing && (
         <div style={{ marginTop: 10 }}>
-          <div className="ttl" style={{ marginBottom: 6 }}><span>Bicing · bicis libres</span></div>
-          <div className="bar" style={{ background: 'linear-gradient(90deg,#B44663,#E59A86,#E6D5A9,#5FBFAE)' }} />
+          <div className="ttl" style={{ marginBottom: 6 }}>Bicing · bicis libres ahora</div>
+          <div className="bar" style={{ background: 'linear-gradient(90deg,#D9607F,#E8B04A,#E9DC7A,#4DB6A0)' }} />
           <div className="ends"><span>Vacía</span><span>Llena</span></div>
         </div>
       )}
@@ -55,7 +77,7 @@ export default function MapControls() {
   return (
     <motion.div className={`mapctl ${sel >= 0 ? 'shift' : ''}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35, type: 'spring', stiffness: 180, damping: 24 }}>
       <Legend />
-      <div className="ctl-stack glass hide-m" ref={wrap} style={{ position: 'relative' }}>
+      <div className="ctl-stack glass hide-m" data-tour="mapctl" ref={wrap} style={{ position: 'relative' }}>
         <button className="icon-btn" onClick={() => zoomBy(0.8)} aria-label="Acercar"><Plus /></button>
         <button className="icon-btn" onClick={() => zoomBy(-0.8)} aria-label="Alejar"><Minus /></button>
         <button className="icon-btn" onClick={resetNorth} aria-label="Orientar al norte" title="Orientar al norte"><Compass ref={compass} className="compass" /></button>

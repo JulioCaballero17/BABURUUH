@@ -27,7 +27,7 @@ export default function WeekHeatmap({ series, current, onPick, label }) {
             <text x={px + cw / 2} y={ch / 2 + 4} textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fill: x > 0.55 ? '#fff' : 'var(--ink)' }}>
               {v >= 1000 ? `${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: v >= 100000 ? 0 : 1 })} k` : Math.round(v)}
             </text>
-            <text x={px + cw / 2} y={ch + 14} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 13, fill: DAYS[d].hue }}>{DAYS[d].short}</text>
+            <text x={px + cw / 2} y={ch + 14} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStretch: '118%', fontWeight: 700, fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', fill: d === current ? 'var(--ink)' : 'var(--ink-3)' }}>{DAYS[d].short}</text>
             <title>{`${DAYS[d].name} · ${Math.round(v).toLocaleString('es-ES')} llegadas`}</title>
           </g>
         )

@@ -35,7 +35,7 @@ export default function DistrictsPanel() {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span className="serif" style={{ fontSize: 22, fontStyle: 'italic' }}>{dayName(th)}</span>
+        <span className="display" style={{ fontSize: 18 }}>{dayName(th)}</span>
         <span className="note">{fmtK(total - inner)} viajes/día entre distritos</span>
       </div>
       <svg viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`} width="100%" role="img" aria-label="Diagrama de cuerdas de los flujos entre distritos" onPointerLeave={() => setFocus(-1)}>

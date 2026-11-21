@@ -50,20 +50,15 @@ export function WeatherIcon({ code, ...rest }) {
   return <C aria-hidden="true" {...rest} />
 }
 
-export function BrandMark({ size = 34 }) {
+// Baburu mark: a taxi-yellow tile with a metro route through three barrios.
+export function BrandMark({ size = 36 }) {
   return (
     <svg className="brand-mark" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="bm" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#5FBFAE" />
-          <stop offset=".3" stopColor="#8EA2EA" />
-          <stop offset=".55" stopColor="#E2C08A" />
-          <stop offset=".78" stopColor="#E79A84" />
-          <stop offset="1" stopColor="#C985B6" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="17" fill="none" stroke="url(#bm)" strokeWidth="3" />
-      <path d="M12 38h8l4-12 6 20 6-26 5 18h11" fill="none" stroke="url(#bm)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="64" height="64" rx="15" fill="#FFC72C" />
+      <path d="M13 45 26 31l11 7 14-17" fill="none" stroke="#17191C" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="13" cy="45" r="5.5" fill="#FFC72C" stroke="#17191C" strokeWidth="4" />
+      <circle cx="37" cy="38" r="5.5" fill="#17191C" />
+      <circle cx="51" cy="21" r="5.5" fill="#FFC72C" stroke="#17191C" strokeWidth="4" />
     </svg>
   )
 }

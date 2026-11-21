@@ -43,8 +43,10 @@ export default function StudyPanel() {
             Sin datos para la burbuja: los ficheros de movilidad solo registran viajes entre barrios distintos (ninguno empieza y acaba en el mismo barrio),
             así que este índice sale 0 % en todos los barrios. Falta decidir cómo definirla con estos datos.
           </p>
+          <p className="note" style={{ marginTop: 10 }}>Mientras tanto, la ficha de cada barrio muestra quién llega (residentes y visitantes) y el modo de color «Visitantes» compara barrios entre sí.</p>
         </section>
       )}
+      {ds.hasStays && <>
       <section>
         <Segmented id="scope" label="Periodo" value={scope} onChange={setScope} options={[{ value: 'day', label: `${DAYS[day].name}` }, { value: 'week', label: 'Media L–V' }]} />
         <div style={{ marginTop: 12 }}>
@@ -60,12 +62,12 @@ export default function StudyPanel() {
 
       <section>
         <div className="section-title"><h3>La burbuja de la ciudad, día a día</h3></div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, alignItems: 'end', height: 120 }}>
+        <div className="day-bars" style={{ height: 120 }}>
           {ds.cityBub.map((v, k) => (
-            <button key={k} onClick={() => goDay(k)} style={{ display: 'grid', gap: 4, justifyItems: 'center', alignSelf: 'stretch', alignContent: 'end' }} aria-label={`${DAYS[k].name}: ${pct(v)}`}>
+            <button key={k} className={`db ${k === day ? 'on' : ''}`} onClick={() => goDay(k)} aria-label={`${DAYS[k].name}: ${pct(v)}`}>
               <span className="num" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{pct(v)}</span>
-              <motion.span style={{ width: '100%', borderRadius: '8px 8px 3px 3px', background: DAYS[k].hue, opacity: k === day ? 1 : 0.55, boxShadow: k === day ? '0 0 0 2px var(--ink)' : 'none' }} initial={{ height: 0 }} animate={{ height: (v / cityMax) * 74 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: k * 0.05 }} />
-              <span className="serif" style={{ fontStyle: 'italic', fontSize: 18, lineHeight: 1, color: DAYS[k].hue }}>{DAYS[k].key}</span>
+              <motion.span className="bar" initial={{ height: 0 }} animate={{ height: (v / (cityMax || 1)) * 74 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: k * 0.05 }} />
+              <span className="lab">{DAYS[k].short}</span>
             </button>
           ))}
         </div>
@@ -87,6 +89,7 @@ export default function StudyPanel() {
         ))}
       </section>
 
+      </>}
       <section>
         <p className="note">
           <b>Índice de burbuja:</b> de todos los viajes que empiezan en un barrio ese día, la parte que termina dentro del mismo barrio.

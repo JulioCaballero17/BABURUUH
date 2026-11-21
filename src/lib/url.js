@@ -10,7 +10,9 @@ export function readHash() {
   if (p.has('p') && /^[\w-]{1,12}$/.test(p.get('p'))) out.period = p.get('p')
   if (p.has('s') && ['all', 'Residente', 'Regional', 'Nacional', 'Internacional'].includes(p.get('s'))) out.segment = p.get('s')
   if (p.has('b')) { const b = Number(p.get('b')); if (Number.isInteger(b) && b >= 0 && b < 73) out.sel = b }
-  if (p.has('m') && ['activity', 'delta', 'bubble', 'influence'].includes(p.get('m'))) out.colorMode = p.get('m')
+  if (p.has('m') && ['activity', 'delta', 'period', 'visitors', 'bubble', 'influence'].includes(p.get('m'))) out.colorMode = p.get('m')
+  if (p.has('cmp') && /^[\w-]{1,12}$/.test(p.get('cmp'))) out.comparePeriod = p.get('cmp')
+  if (p.has('vk') && ['all', 'intl'].includes(p.get('vk'))) out.visitorKind = p.get('vk')
   if (p.has('base')) out.deltaBase = Math.max(0, Math.min(4, Number(p.get('base')) || 0))
   if (p.has('v') && ['3d', '2d', 'off'].includes(p.get('v'))) out.barrios = p.get('v')
   if (p.has('l')) {
@@ -32,6 +34,8 @@ export function writeHash(s, cam) {
   if (s.sel >= 0) p.set('b', String(s.sel))
   p.set('m', s.colorMode)
   if (s.colorMode === 'delta') p.set('base', String(s.deltaBase))
+  if (s.colorMode === 'period') p.set('cmp', s.comparePeriod)
+  if (s.colorMode === 'visitors') p.set('vk', s.visitorKind)
   p.set('v', s.layers.barrios)
   p.set('l', LAYER_KEYS.map((k) => (s.layers[k] ? '1' : '0')).join(''))
   if (cam) p.set('cam', [cam.center[0].toFixed(5), cam.center[1].toFixed(5), cam.zoom.toFixed(2), cam.pitch.toFixed(0), cam.bearing.toFixed(0)].join(','))

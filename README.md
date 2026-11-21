@@ -1,8 +1,11 @@
-# Pulso de Barcelona
+# Baburu
 
-Observatorio 3D de la movilidad entre los 73 barrios de Barcelona, de lunes a viernes, con **datos reales
-diarios** (enero 2023 – agosto 2025). Mapa satélite con relieve y edificios en 3D, capas de datos animadas
-y paneles de análisis para el estudio de las «burbujas» de barrio.
+Cómo se mueve la gente entre los 73 barrios de Barcelona, de lunes a viernes, con los **datos de movilidad de
+Telefónica** (enero 2023 – agosto 2025). Mapa 3D (satélite o plano) con capas de datos animadas, fichas de barrio,
+paneles de análisis y un **Tour** que recorre todas las funciones para presentar el proyecto.
+
+**Diseño «Plano de Barcelona»**: paneles sólidos en blanco o asfalto, un único acento amarillo taxi, tipografía
+Archivo (títulos, estilo señalética) + Geist (texto). La semana se muestra como una **línea de metro**.
 
 ## Cómo arrancarlo
 
@@ -14,7 +17,7 @@ npm run dev
 ```
 
 Se abre solo en `http://localhost:5173`. Recomendado Chrome o Edge en un ordenador con tarjeta gráfica;
-si el equipo va justo, la app activa sola un «modo ligero» (sin desenfoque de los paneles).
+si el equipo va justo, la app activa sola un «modo ligero».
 
 Para generar la versión de producción: `npm run build` y `npm run preview`.
 
@@ -32,6 +35,10 @@ con la **media de cada día laborable** (lunes … viernes) de los viajes entre 
 (Residente, Regional, Nacional, Internacional). Los fines de semana se descartan. Hay que volver a ejecutarlo
 cuando lleguen meses nuevos. La app carga el periodo elegido bajo demanda.
 
+Al final, el mismo script escribe `summary.json` (≈145 KB): la media de llegadas y salidas por barrio, periodo y tipo
+de viajero. Lo usan la **evolución mes a mes** de la ficha y el modo **Cambio entre periodos**. Si solo quieres
+regenerar el resumen a partir de los JSON ya creados: `node scripts/build-summary.mjs`.
+
 **Limitaciones de los datos**
 - Son **diarios**: no hay horas, así que toda la app trabaja por días.
 - Solo contienen viajes **entre barrios distintos** (ninguna fila con origen = destino). Por eso el índice de
@@ -41,33 +48,39 @@ cuando lleguen meses nuevos. La app carga el periodo elegido bajo demanda.
 
 ## Qué puedes hacer
 
-- **Intro de cine**: la Tierra en 3D y un vuelo hasta Barcelona.
-- **Semana media**: de lunes a viernes, día a día, con reproducción a tres velocidades.
-- **Periodo y tipo de viajero**: cualquier mes, año o el total; todos los viajeros, residentes o visitantes.
-- **Cuatro lecturas del mapa**: actividad (llegadas/km²), diferencia con otro día, índice de burbuja e influencia de un barrio.
-- **Capas**: columnas 3D o plano por barrio, colmena hexagonal 3D, viajes animados, arcos de conexión,
-  burbujas flotantes, pulso de los barrios más activos, relieve, edificios, rotulación.
-- **Ficha de barrio**: llegadas por día (clic para saltar a ese día), día con más llegadas,
-  destinos y orígenes, y su «ADN» comparado con la mediana de la ciudad.
-- **Comparador** de dos barrios: llegadas por día, cifras, burbuja por día y ADN superpuesto.
-- **Estudio de la hipótesis**: restaurantes por habitante frente al índice de burbuja, con regresión.
-- **Ranking en directo**, **diagrama de cuerdas** entre distritos y **hallazgos automáticos**.
-- **Historias**: recorrido guiado escrito a partir de los datos, ideal para presentar (avanza con las flechas).
-- **Datos en directo**: tiempo real y previsión de la semana (Open-Meteo) y estaciones de Bicing (CityBikes).
-- **Tus datos**: arrastra un CSV (también un fichero mensual original) y todo se recalcula. Exporta métricas y flujos en CSV.
-- **Captura PNG** con leyenda y **enlace** que reproduce exactamente la vista (día, periodo, tipo de viajero, barrio, cámara).
+- **Tour** (botón amarillo arriba o tecla `T`): 19 pasos que muestran cada función. En cada paso la app se coloca sola
+  (día, panel, colores, barrio, cámara) y un anillo amarillo señala el control del que se habla. Los textos se escriben
+  con los datos cargados. Avanza con `→`, `Espacio`, `Intro` o un mando de presentaciones; `←` vuelve; `F` pantalla
+  completa; `Esc` sale.
+- **Línea de metro**: cada parada es un día laborable con su número de viajes. Reproducción a tres velocidades.
+- **Periodo y tipo de viajero** en la barra inferior: cualquier mes, año o el total; residentes o visitantes.
+- **Seis lecturas del mapa** (panel Mapa): actividad, cambio entre días, **cambio entre periodos** (nuevo),
+  **visitantes** (nuevo: parte de quien llega que no vive en Barcelona, o solo internacionales), influencia de un
+  barrio y burbuja. La **leyenda** está siempre visible y explica qué significa el color en cada modo.
+- **Capas**: columnas 3D o plano, colmena 3D, viajes animados, arcos, burbujas, pulso, relieve, edificios, calles.
+  Mapa base satélite o **plano** (vectorial, claro u oscuro).
+- **Ficha de barrio**: llegadas, día fuerte, **evolución mes a mes** (nuevo, clic en un mes para cargarlo),
+  **quién llega** (nuevo: residentes y visitantes de Cataluña, España y extranjero), destinos y orígenes, y su «ADN».
+- **Comparador** de dos barrios.
+- **Análisis**: ranking del día, diagrama de cuerdas entre distritos, hipótesis de la burbuja y hallazgos automáticos.
+- **Tus datos**: arrastra un CSV y todo se recalcula. Exporta métricas y flujos en CSV.
+- **Captura PNG** con leyenda y **enlace** que reproduce exactamente la vista.
 - **Búsqueda** de barrios y acciones con `Ctrl K`.
+- Bicing en directo (opcional, en Capas).
 
 ## Atajos
 
 | Tecla | Acción |
 |---|---|
+| T | Empezar o salir del tour |
 | Espacio | Reproducir / pausar |
 | 1 – 5 | Ir de lunes a viernes |
-| ← → | Día anterior / siguiente |
+| ← → | Día anterior / siguiente (en el tour: paso anterior / siguiente) |
 | Ctrl K o / | Buscar |
-| L B R G S I | Capas, Burbujas, Ranking, Distritos, Historias, Datos |
-| D | Comparar con el lunes |
+| L | Mapa: capas y colores |
+| R G B N | Análisis: ranking, distritos, burbujas, hallazgos |
+| I | Datos |
+| D | Comparar el día con el lunes |
 | O | Órbita automática |
 | H | Vista inicial |
 | P | Captura |
@@ -97,9 +110,9 @@ Sants,la Vila de Gràcia,Lunes,4120
 - Imágenes de satélite: Esri World Imagery (© Esri, Maxar, Earthstar Geographics).
 - Relieve: Mapzen / AWS Terrain Tiles.
 - Edificios y tipografías del mapa: OpenFreeMap, OpenMapTiles, © OpenStreetMap.
-- Rotulación y cartografía: © CARTO, © OpenStreetMap.
+- Plano y rotulación: OpenFreeMap, OpenMapTiles, © OpenStreetMap (sin clave de API).
 - Límites de barrios: Ajuntament de Barcelona (Open Data BCN), vía martgnz/bcn-geodata.
-- Tiempo: Open-Meteo. Bicing: CityBikes API.
+- Datos de movilidad: Telefónica (Càtedra Telefónica, UPF). Bicing: CityBikes API.
 
 ## Estructura
 
@@ -107,9 +120,10 @@ Sants,la Vila de Gràcia,Lunes,4120
 src/
   engine/        mapa (MapLibre + deck.gl), estilo, capas y bucle de animación
   model/         geometría, carga de datos reales, simulación, métricas diarias, importación CSV
-  components/    interfaz (barra superior, paneles, ficha, timeline, modales)
-  lib/           colores, días, APIs, historias, URL compartible
+  components/    interfaz (barra superior, navegación, paneles, ficha, línea de metro, tour, modales)
+  lib/           colores, leyenda, pasos del tour, APIs, URL compartible
   store.js       estado global (zustand)
 scripts/
-  preprocess-mobility.mjs   ficheros crudos → public/data/movilidad
+  preprocess-mobility.mjs   ficheros crudos → public/data/movilidad (+ summary.json)
+  build-summary.mjs         resumen ligero por periodo para la evolución y la comparación
 ```

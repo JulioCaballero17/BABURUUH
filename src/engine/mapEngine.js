@@ -4,11 +4,12 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useStore, selectDark } from '../store.js'
-import { buildStyle, rampExpr } from './mapStyle.js'
+import { buildStyle, rampExpr, PLANO, PLANO_LAYERS, LABEL_LAYERS } from './mapStyle.js'
 import { buildDeckLayers, buildTrips } from './deckLayers.js'
 import { BARRIOS, N, HEXES } from '../model/geo.js'
 import { STEPS } from '../model/simulate.js'
-import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, hexToRgb, mix, rgbStr } from '../lib/colors.js'
+import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, hexToRgb, mix, rgbStr } from '../lib/colors.js'
+import { visitorShares, shareRange, periodRatio } from '../model/derive.js'
 import { sunAt, dayOf } from '../lib/week.js'
 import { clamp, smoothstep } from '../lib/format.js'
 
@@ -67,7 +68,7 @@ export function initMap(container, startCam) {
     fadeDuration: 180,
     canvasContextAttributes: { antialias: true, preserveDrawingBuffer: true },
   })
-  map.addControl(new maplibregl.AttributionControl({ compact: false, customAttribution: 'Tiempo: Open-Meteo · Bicing: CityBikes' }), 'bottom-left')
+  map.addControl(new maplibregl.AttributionControl({ compact: false, customAttribution: 'Movilidad: Telefónica · Bicing: CityBikes' }), 'bottom-left')
   map.on('load', () => {
     E.ready = true
     wireEvents()
@@ -199,7 +200,7 @@ function sampleElevation() {
 }
 
 /* ------------------------------------------------------------------ discrete state → style */
-const RAMPS = { activity: RAMP_ACTIVITY, delta: RAMP_DELTA, bubble: RAMP_BUBBLE, influence: RAMP_INFLUENCE }
+const RAMPS = { activity: RAMP_ACTIVITY, delta: RAMP_DELTA, period: RAMP_DELTA, visitors: RAMP_VISITORS, bubble: RAMP_BUBBLE, influence: RAMP_INFLUENCE }
 function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none') }
 
 function applyDiscrete(s, force = false) {
@@ -208,14 +209,26 @@ function applyDiscrete(s, force = false) {
   const dark = selectDark(s)
   const L = s.layers
   if (force || prev.basemap !== s.basemap || prev.dark !== dark) {
-    vis('satellite', s.basemap === 'satelite')
-    vis('basemap-light', s.basemap === 'mapa' && !dark)
-    vis('basemap-dark', s.basemap === 'mapa' && dark)
+    const plano = s.basemap === 'mapa'
+    vis('satellite', !plano)
+    PLANO_LAYERS.forEach((id) => vis(id, plano))
+    const P = dark ? PLANO.dark : PLANO.light
+    map.setPaintProperty('plano-bg', 'background-color', P.bg)
+    map.setPaintProperty('plano-park', 'fill-color', P.park)
+    map.setPaintProperty('plano-water', 'fill-color', P.water)
+    map.setPaintProperty('plano-road-case', 'line-color', P.roadCase)
+    map.setPaintProperty('plano-road-minor', 'line-color', P.roadMinor)
+    map.setPaintProperty('plano-road', 'line-color', P.road)
+    map.setPaintProperty('plano-rail', 'line-color', P.rail)
+    const light = plano && !dark
+    LABEL_LAYERS.forEach((id) => {
+      map.setPaintProperty(id, 'text-color', light ? P.label : 'rgba(255,255,255,0.92)')
+      map.setPaintProperty(id, 'text-halo-color', light ? P.halo : 'rgba(10,12,14,0.8)')
+    })
   }
   if (force || prev.layers !== L || prev.intro !== s.intro) {
     vis('buildings', L.buildings)
-    vis('labels-light', L.labels && s.basemap === 'satelite')
-    vis('labels-dark', L.labels && s.basemap === 'satelite')
+    LABEL_LAYERS.forEach((id) => vis(id, L.labels))
     vis('barrio-names', L.names)
     vis('bicing', L.bicing)
     vis('hex-ext', L.hex)
@@ -239,6 +252,8 @@ function applyDiscrete(s, force = false) {
     map.setPaintProperty('barrios-fill', 'fill-color', rampExpr(ramp))
     map.setPaintProperty('barrios-3d', 'fill-extrusion-color', rampExpr(ramp))
     map.setPaintProperty('hex-ext', 'fill-extrusion-color', rampExpr(s.colorMode === 'delta' ? RAMP_DELTA : RAMP_ACTIVITY))
+    // a light outline reads on the satellite; on the light street map it needs to be dark
+    E.lightKey = ''
   }
   if (force || prev.bicing !== s.bicing) {
     const src = map.getSource('bicing')
@@ -250,7 +265,7 @@ function applyDiscrete(s, force = false) {
 
 /* ------------------------------------------------------------------ lighting from the real sun */
 const C = {
-  bldDay: hexToRgb('#DCD6CA'), bldNight: hexToRgb('#1A2331'),
+  bldDay: hexToRgb('#D9DCD8'), bldNight: hexToRgb('#1A2331'),
   lightDay: hexToRgb('#FFF2DC'), lightNight: hexToRgb('#8EA4D4'),
   skyDay: hexToRgb('#86AED6'), skyNight: hexToRgb('#050A14'), skyDusk: hexToRgb('#3F4D7E'),
   horDay: hexToRgb('#E8DDCB'), horNight: hexToRgb('#17233A'), horDusk: hexToRgb('#E59A72'),
@@ -258,15 +273,13 @@ const C = {
 }
 function applyLighting(sun, s) {
   const n = sun.nightness
-  const key = `${Math.round(n * 60)}|${Math.round(sun.bearing / 3)}|${s.layers.labels}|${s.basemap}`
+  const key = `${Math.round(n * 60)}|${Math.round(sun.bearing / 3)}|${s.layers.labels}|${s.basemap}|${selectDark(s)}`
   if (key === E.lightKey) return
   E.lightKey = key
   const dusk = Math.exp(-((sun.altitude - 1) ** 2) / 50)
   map.setPaintProperty('satellite', 'raster-brightness-max', 1 - 0.62 * n)
   map.setPaintProperty('satellite', 'raster-saturation', -0.1 - 0.45 * n + 0.1 * dusk)
   map.setPaintProperty('satellite', 'raster-contrast', 0.05 + 0.12 * n)
-  map.setPaintProperty('labels-light', 'raster-opacity', (1 - n) * 0.92)
-  map.setPaintProperty('labels-dark', 'raster-opacity', n * 0.92)
   map.setPaintProperty('buildings', 'fill-extrusion-color', rgbStr(mix(C.bldDay, C.bldNight, n)))
   map.setLight({
     anchor: 'map',
@@ -284,7 +297,7 @@ function applyLighting(sun, s) {
     'fog-ground-blend': 0.3,
     'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 8, 1, 11, 0],
   })
-  map.setPaintProperty('barrios-line', 'line-color', n > 0.5 ? 'rgba(214,226,240,0.55)' : 'rgba(255,255,255,0.7)')
+  map.setPaintProperty('barrios-line', 'line-color', s.basemap === 'mapa' && !selectDark(s) ? 'rgba(23,25,28,0.45)' : 'rgba(255,255,255,0.7)')
 }
 
 /* ------------------------------------------------------------------ per-frame data → feature state */
@@ -312,6 +325,13 @@ function updateBarrios(s, t, grow) {
     }
     shareMax = Math.max(...shares) || 1
   }
+  let vShares = null
+  let vRange = [0, 1]
+  if (mode === 'visitors') {
+    vShares = visitorShares(ds, day, s.visitorKind)
+    if (vShares) vRange = shareRange(vShares, ds, day)
+  }
+  const pr = mode === 'period' ? periodRatio(s.summary, ds.source.periodId, s.comparePeriod, s.segment) : null
   let bMin = 1
   let bMax = 0
   if (mode === 'bubble') ds.metrics.forEach((m) => { bMin = Math.min(bMin, m.bub[day]); bMax = Math.max(bMax, m.bub[day]) })
@@ -325,6 +345,10 @@ function updateBarrios(s, t, grow) {
     if (mode === 'delta') {
       const ref = R0[i] * (1 - rf) + R1[i] * rf
       v = (clamp(Math.log2((dens + 0.5) / (ref + 0.5)) / 1.1, -1, 1) + 1) / 2
+    } else if (mode === 'period') {
+      v = pr ? (clamp(Math.log2((pr.cur[i] + 0.5) / (pr.ref[i] + 0.5)) / 1.1, -1, 1) + 1) / 2 : 0.5
+    } else if (mode === 'visitors') {
+      v = vShares ? clamp((vShares[i] - vRange[0]) / (vRange[1] - vRange[0])) : 0
     } else if (mode === 'bubble') {
       v = bMax > bMin ? (ds.metrics[i].bub[day] - bMin) / (bMax - bMin) : 0
     } else if (shares) {
@@ -417,7 +441,7 @@ function frame(now) {
   applyLighting(sun, s)
 
   const grow = s.intro === 'done' ? (reduceMotion ? 1 : smoothstep((now - E.growStart - 300) / 2600)) : 0
-  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}`
+  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}|${s.comparePeriod}|${!!s.summary}|${s.visitorKind}`
   if (key !== E.stateKey) { E.stateKey = key; updateBarrios(s, t, grow) }
   if (s.layers.hex) {
     const hk = `${t.toFixed(3)}|${s.dataset.version}|${grow.toFixed(3)}|${s.colorMode}|${s.deltaBase}`
@@ -468,12 +492,14 @@ export async function capturePNG({ title, subtitle, legend }) {
   const g = c.getContext('2d')
   g.drawImage(src, 0, 0)
   const grad = g.createLinearGradient(0, H - 220 * k, 0, H)
-  grad.addColorStop(0, 'rgba(6,10,16,0)')
-  grad.addColorStop(1, 'rgba(6,10,16,0.82)')
+  grad.addColorStop(0, 'rgba(14,16,18,0)')
+  grad.addColorStop(1, 'rgba(14,16,18,0.86)')
   g.fillStyle = grad
   g.fillRect(0, H - 220 * k, W, 220 * k)
-  g.fillStyle = '#F2EEE6'
-  g.font = `italic ${44 * k}px "Instrument Serif", Georgia, serif`
+  g.fillStyle = '#FFC72C'
+  g.fillRect(36 * k, H - 128 * k, 56 * k, 6 * k)
+  g.fillStyle = '#F3F4F1'
+  g.font = `700 ${40 * k}px "Archivo Variable", system-ui, sans-serif`
   g.fillText(title, 36 * k, H - 74 * k)
   g.font = `500 ${15 * k}px "Geist Variable", system-ui, sans-serif`
   g.fillStyle = 'rgba(242,238,230,0.78)'
@@ -495,6 +521,6 @@ export async function capturePNG({ title, subtitle, legend }) {
   }
   g.font = `400 ${11 * k}px "Geist Mono Variable", monospace`
   g.fillStyle = 'rgba(242,238,230,0.55)'
-  g.fillText('Imágenes © Esri · Relieve AWS Terrain · Edificios © OpenStreetMap', 38 * k, H - 18 * k)
+  g.fillText('Baburu · Datos de movilidad: Telefónica · Imágenes © Esri · © OpenStreetMap', 38 * k, H - 18 * k)
   return c.toDataURL('image/png')
 }

@@ -192,3 +192,51 @@ export function districtMatrix(ds, t) {
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) M[BARRIOS[i].dist - 1][BARRIOS[j].dist - 1] += Ft[i * N + j]
   return M
 }
+
+// Share of each barrio's arrivals that come from visitors (anyone who is not a resident of Barcelona),
+// or only from international visitors. Null when the data has no traveller types.
+export function visitorShares(ds, day, kind = 'all') {
+  const S = ds.segArr
+  if (!S || !S.Residente) return null
+  const names = Object.keys(S)
+  const out = new Float32Array(N)
+  for (let i = 0; i < N; i++) {
+    let tot = 0
+    let vis = 0
+    for (const n of names) {
+      const v = S[n][day][i]
+      tot += v
+      if (kind === 'intl' ? n === 'Internacional' : n !== 'Residente') vis += v
+    }
+    out[i] = tot ? vis / tot : 0
+  }
+  return out
+}
+
+// Min and max share across barrios with a meaningful number of arrivals (for the colour scale).
+export function shareRange(shares, ds, day) {
+  let lo = 1
+  let hi = 0
+  for (let i = 0; i < N; i++) {
+    if (ds.ARR[day][i] < 200) continue
+    lo = Math.min(lo, shares[i])
+    hi = Math.max(hi, shares[i])
+  }
+  return hi > lo ? [lo, hi] : [0, 1]
+}
+
+// Average weekday arrivals of the current period divided by those of the reference period, per barrio.
+export function periodRatio(summary, period, ref, segment = 'all') {
+  const pick = (id) => {
+    const p = summary?.arr?.[id]
+    if (!p) return null
+    const names = segment === 'all' ? summary.segments : [segment]
+    const out = new Float32Array(N)
+    for (const n of names) if (p[n]) for (let i = 0; i < N; i++) out[i] += p[n][i]
+    return out
+  }
+  const a = pick(period)
+  const b = pick(ref)
+  if (!a || !b) return null
+  return { cur: a, ref: b }
+}

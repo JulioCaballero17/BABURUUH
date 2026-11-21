@@ -1,44 +1,56 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useStore } from '../store.js'
 import { panelMotion } from './ui/primitives.jsx'
+import { PANELS, groupOf } from './Rail.jsx'
 import LayersPanel from './panels/LayersPanel.jsx'
 import StudyPanel from './panels/StudyPanel.jsx'
 import RankingPanel from './panels/RankingPanel.jsx'
 import DistrictsPanel from './panels/DistrictsPanel.jsx'
-import StoriesPanel from './panels/StoriesPanel.jsx'
+import InsightsPanel from './panels/StoriesPanel.jsx'
 import DataPanel from './panels/DataPanel.jsx'
 
-const META = {
-  capas: { eyebrow: 'Mapa', title: 'Capas y lectura', text: 'Qué se ve sobre el satélite y cómo se colorean los barrios.', C: LayersPanel },
-  estudio: { eyebrow: 'Estudio', title: 'La hipótesis de la burbuja', text: '¿Los barrios con más restaurantes retienen a su gente?', C: StudyPanel },
-  ranking: { eyebrow: 'En directo', title: 'Ranking de barrios', text: 'Quién recibe, quién vacía y quién se queda, día a día.', C: RankingPanel },
-  distritos: { eyebrow: 'Flujos', title: 'De distrito a distrito', text: 'Los 10 distritos y los viajes entre ellos ese día.', C: DistrictsPanel },
-  historias: { eyebrow: 'Narrativa', title: 'Historias de la semana', text: 'Recorridos guiados por lo más llamativo de los datos.', C: StoriesPanel },
-  datos: { eyebrow: 'Datos', title: 'Datos', text: 'Elige el periodo y el tipo de viajero, o importa tu propio CSV.', C: DataPanel },
+const GROUP_META = {
+  mapa: { eyebrow: 'Mapa', title: 'Capas y colores', text: 'Qué significa el color de cada barrio y qué se dibuja encima.' },
+  analisis: { eyebrow: 'Análisis', title: 'Qué dicen los datos', text: 'Rankings, flujos entre distritos, la hipótesis de las burbujas y hallazgos automáticos.' },
+  datos: { eyebrow: 'Datos', title: 'Periodo y fuente', text: 'Elige el mes o el año y el tipo de viajero. También puedes importar o exportar CSV.' },
 }
+const PANEL_C = { capas: LayersPanel, ranking: RankingPanel, distritos: DistrictsPanel, estudio: StudyPanel, hallazgos: InsightsPanel, datos: DataPanel }
 
 export default function SidePanel() {
   const panel = useStore((s) => s.panel)
-  const setPanel = useStore((s) => s.setPanel)
-  const m = META[panel]
+  const openPanel = useStore((s) => s.openPanel)
+  const group = groupOf(panel)
+  const m = GROUP_META[group]
+  const C = PANEL_C[panel]
+  const tabs = PANELS.filter((p) => p.group === group)
   return (
-    <AnimatePresence mode="wait">
-      {m && (
-        <motion.aside key={panel} className="side-panel glass" aria-label={m.title} {...panelMotion}>
+    <>
+      {m && C && (
+        <motion.aside key={group} className="side-panel glass" aria-label={m.title} data-tour="panel" initial={panelMotion.initial} animate={panelMotion.animate}>
           <div className="panel-head">
             <div>
               <p className="eyebrow">{m.eyebrow}</p>
               <h2>{m.title}</h2>
               <p>{m.text}</p>
             </div>
-            <button className="icon-btn" onClick={() => setPanel(panel)} aria-label="Cerrar panel"><X /></button>
+            <button className="icon-btn" onClick={() => useStore.setState({ panel: null })} aria-label="Cerrar panel"><X /></button>
           </div>
-          <div className="panel-body">
-            <m.C />
+          {tabs.length > 1 && (
+            <div className="tabs" role="tablist" aria-label={m.title}>
+              {tabs.map((t) => (
+                <button key={t.key} role="tab" data-tour={`tab-${t.key}`} aria-selected={panel === t.key} onClick={() => openPanel(t.key)} title={`${t.label} (${t.kb})`}>
+                  {t.label}
+                  {panel === t.key && <motion.span layoutId="tab-line" className="tab-line" transition={{ type: 'spring', stiffness: 480, damping: 38 }} />}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="panel-body" key={panel}>
+            <C />
           </div>
         </motion.aside>
       )}
-    </AnimatePresence>
+    </>
   )
 }

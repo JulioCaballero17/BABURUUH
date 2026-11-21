@@ -10,8 +10,8 @@ import { dnaAxes } from '../lib/dna.js'
 import { fmt, fmtK, pct } from '../lib/format.js'
 import { dayOf } from '../lib/week.js'
 
-const CA = '#4FA69A'
-const CB = '#B86FA3'
+const CA = '#2F8A9A'
+const CB = '#D9607F'
 
 function WeekLines({ a, b, current }) {
   const W = 900
@@ -34,7 +34,7 @@ function WeekLines({ a, b, current }) {
         {DAYS.map((d, k) => (
           <g key={d.key}>
             {k > 0 && <line x1={X(k - 0.5)} x2={X(k - 0.5)} y1={m.t} y2={H - m.b} />}
-            <text x={X(k)} y={H - 8} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 14, fill: d.hue }}>{d.name}</text>
+            <text x={X(k)} y={H - 8} textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontStretch: '118%', fontWeight: 700, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', fill: k === current ? 'var(--ink)' : 'var(--ink-3)' }}>{d.short}</text>
           </g>
         ))}
       </g>
@@ -123,7 +123,7 @@ export default function CompareModal() {
       {open && A >= 0 && data && (
         <>
           <motion.div key="scrim" className="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} />
-          <motion.div key="modal" className="modal glass" role="dialog" aria-modal="true" aria-label="Comparar barrios" initial={{ opacity: 0, scale: 0.96, x: '-50%', y: '-46%' }} animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }} exit={{ opacity: 0, scale: 0.97, x: '-50%', y: '-48%', transition: { duration: 0.16 } }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
+          <motion.div key="modal" className="modal glass" data-tour="compare" role="dialog" aria-modal="true" aria-label="Comparar barrios" initial={{ opacity: 0, scale: 0.96, x: '-50%', y: '-46%' }} animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }} exit={{ opacity: 0, scale: 0.97, x: '-50%', y: '-48%', transition: { duration: 0.16 } }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                 <h2 className="serif" style={{ margin: 0, fontSize: 36, lineHeight: 1, color: CA }}>{BARRIOS[A].name}</h2>
@@ -173,7 +173,7 @@ export default function CompareModal() {
                           <motion.span initial={{ height: 0 }} animate={{ height: `${(ds.metrics[A].bub[k] / mx) * 100}%` }} style={{ flex: 1, background: CA, borderRadius: '5px 5px 2px 2px' }} title={`${BARRIOS[A].short}: ${pct(ds.metrics[A].bub[k])}`} />
                           <motion.span initial={{ height: 0 }} animate={{ height: `${(ds.metrics[B].bub[k] / mx) * 100}%` }} style={{ flex: 1, background: CB, borderRadius: '5px 5px 2px 2px' }} title={`${BARRIOS[B].short}: ${pct(ds.metrics[B].bub[k])}`} />
                         </div>
-                        <span className="serif" style={{ fontStyle: 'italic', fontSize: 16, color: d.hue, lineHeight: 1 }}>{d.key}</span>
+                        <span className="eyebrow" style={{ color: k === th ? 'var(--ink)' : 'var(--ink-3)' }}>{d.short}</span>
                       </div>
                     )
                   })}
