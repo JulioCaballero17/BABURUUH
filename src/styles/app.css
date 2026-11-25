@@ -380,9 +380,9 @@ input, select { font: inherit; color: inherit; }
 .intro .eyebrow { color: rgba(243,244,241,.6); display: flex; align-items: center; gap: 10px; }
 .intro .eyebrow::before { content: ''; width: 28px; height: 4px; border-radius: 2px; background: var(--accent); }
 .intro h1 { margin: 18px 0 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 900; font-size: clamp(64px, 11vw, 150px); line-height: 0.86; letter-spacing: -0.04em; text-transform: uppercase; }
-.intro h1 span { display: block; font-stretch: 100%; font-weight: 500; font-size: 0.24em; letter-spacing: -0.01em; text-transform: none; line-height: 1.15; margin-top: 16px; color: var(--accent); }
+.intro h1 span { display: block; font-stretch: 100%; font-weight: 500; font-size: 0.22em; letter-spacing: -0.01em; text-transform: none; line-height: 1.15; margin-top: 16px; color: var(--accent); }
 .intro p { margin: 22px 0 30px; font-size: 16px; line-height: 1.55; color: rgba(243,244,241,.76); max-width: 48ch; }
-.intro-cta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.intro-cta { margin-top: 36px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .intro .go { height: 52px; padding: 0 24px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-family: var(--font-display); font-stretch: 112%; font-weight: 750; font-size: 15px; display: inline-flex; align-items: center; gap: 10px; transition: transform 180ms var(--ease-out); }
 .intro .go:hover { transform: translateY(-2px); }
 .intro .go svg { width: 18px; height: 18px; }
@@ -426,9 +426,9 @@ input, select { font: inherit; color: inherit; }
 .insight span { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1240px) {
+@media (max-width: 1680px) {
   .search-btn { min-width: 0; }
-  .search-btn .lbl { display: none; }
+  .search-btn .lbl, .search-btn .kbd { display: none; }
 }
 @media (max-width: 1240px) {
   .search-btn .kbd { display: none; }
@@ -471,3 +471,46 @@ input, select { font: inherit; color: inherit; }
   .intro-stats { flex-wrap: wrap; }
   .intro-stats div { padding-right: 16px; margin-right: 16px; }
 }
+
+/* ---------- view switch (map · metro · particles) ---------- */
+.views { position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: flex; gap: 2px; padding: 5px; height: var(--top-h); align-items: center; }
+.views button { position: relative; isolation: isolate; height: 44px; padding: 0 16px; border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--ink-2); transition: color 160ms; white-space: nowrap; }
+.views button:hover { color: var(--ink); }
+.views button svg { width: 17px; height: 17px; }
+.views button[aria-pressed='true'] { color: var(--paper); }
+.view-thumb { position: absolute; inset: 0; z-index: -1; border-radius: var(--r-md); background: var(--ink); }
+.views button[aria-pressed='true'] svg { color: var(--accent); }
+@media (max-width: 1240px) { .views .lbl { display: none; } .views button { padding: 0 12px; } }
+@media (max-width: 760px) { .views { top: calc(var(--top-h) + 8px); height: 46px; } .views button { height: 36px; } }
+
+/* ---------- metro legend ---------- */
+.metro-legend { width: 300px; }
+.metro-lines { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.metro-lines button { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 8px; text-align: left; font-size: 12.5px; transition: background-color 140ms; }
+.metro-lines button:hover, .metro-lines button[aria-pressed='true'] { background: var(--paper-2); }
+.roundel { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-stretch: 112%; font-weight: 800; font-size: 11.5px; letter-spacing: 0.02em; flex: none; box-shadow: 0 0 0 2px var(--paper); }
+.metro-lines .ends-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.metro-lines .ends-txt span { color: var(--ink-3); font-weight: 400; }
+.metro-lines .vol { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+
+/* ---------- cinematic flight ---------- */
+.app.cinema .topbar, .app.cinema .rail, .app.cinema .side-panel, .app.cinema .drawer, .app.cinema .mapctl, .app.cinema .dock, .app.cinema .tip, .app.cinema .tour-card, .app.cinema .tour-ring, .app.cinema .tour-badge, .app.cinema .views {
+  opacity: 0 !important; pointer-events: none !important; transition: opacity 600ms var(--ease-io);
+}
+.app.cinema > .map .maplibregl-ctrl-bottom-left { opacity: 0.5; }
+.cinema-layer { position: fixed; inset: 0; z-index: var(--z-tour); pointer-events: none; color: #F3F4F1; }
+.letterbox { position: absolute; left: 0; right: 0; height: 9vh; background: #070809; }
+.letterbox.top { top: 0; transform-origin: top; }
+.letterbox.bottom { bottom: 0; transform-origin: bottom; }
+.cinema-caption { position: absolute; left: clamp(24px, 6vw, 96px); bottom: calc(9vh + 48px); max-width: 900px; text-shadow: 0 2px 24px rgba(0,0,0,.55); }
+.cinema-caption .eyebrow { color: var(--accent); display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.cinema-caption .eyebrow::before { content: ''; width: 32px; height: 4px; border-radius: 2px; background: var(--accent); }
+.cinema-caption h2 { margin: 14px 0 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 900; font-size: clamp(40px, 6.4vw, 96px); line-height: 0.92; letter-spacing: -0.035em; text-transform: uppercase; text-wrap: balance; }
+.cinema-caption .sub { margin: 16px 0 0; font-size: clamp(15px, 1.5vw, 20px); color: rgba(243,244,241,.85); }
+.cinema-progress { position: absolute; left: clamp(24px, 6vw, 96px); right: clamp(24px, 6vw, 96px); bottom: calc(9vh / 2 - 2px); display: flex; gap: 6px; }
+.cinema-progress i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; }
+.cinema-progress i.done { background: rgba(255,255,255,.7); }
+.cinema-progress i b { display: block; height: 100%; background: var(--accent); transform-origin: left; }
+.cinema-exit { position: absolute; top: calc(9vh / 2 - 16px); right: 24px; pointer-events: auto; height: 32px; padding: 0 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; color: rgba(243,244,241,.7); font-size: 12.5px; }
+.cinema-exit:hover { color: #fff; background: rgba(255,255,255,.08); }
+.cinema-exit svg { width: 15px; height: 15px; }

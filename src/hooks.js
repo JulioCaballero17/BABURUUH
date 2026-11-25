@@ -5,6 +5,7 @@ import { writeHash } from './lib/url.js'
 import { getCamera, flyHome, getMap } from './engine/mapEngine.js'
 import { PANELS } from './components/Rail.jsx'
 import { downloadCapture } from './components/TopBar.jsx'
+import { setView } from './engine/mapEngine.js'
 
 const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"]')
 
@@ -29,6 +30,10 @@ export function useShortcuts() {
       if (e.key === ' ' && !onButton) { e.preventDefault(); s.togglePlay(); return }
       if (/^[1-5]$/.test(e.key) && !s.story.active) { s.goDay(Number(e.key) - 1); return }
       if (e.key.toLowerCase() === 't') { s.setStory({ active: !s.story.active, idx: 0 }); return }
+      if (s.cinema.active) return
+      if (e.key.toLowerCase() === 'v' && !s.story.active) { s.setCinema({ active: true, idx: 0 }); return }
+      if (e.key.toLowerCase() === 'm' && !s.story.active) { setView('metro'); return }
+      if (e.key.toLowerCase() === 'e' && !s.story.active) { setView('flujo'); return }
       if (e.key === 'ArrowRight' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(1); return }
       if (e.key === 'ArrowLeft' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(-1); return }
       if (e.key === '/') { e.preventDefault(); s.setCmdk(true); return }

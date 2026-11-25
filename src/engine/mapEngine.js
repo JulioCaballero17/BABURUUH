@@ -10,12 +10,16 @@ import { BARRIOS, N, HEXES } from '../model/geo.js'
 import { STEPS } from '../model/simulate.js'
 import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, hexToRgb, mix, rgbStr } from '../lib/colors.js'
 import { visitorShares, shareRange, periodRatio } from '../model/derive.js'
+import { buildMetro } from './metro.js'
+import { buildParticles } from './particles.js'
 import { sunAt, dayOf } from '../lib/week.js'
 import { clamp, smoothstep } from '../lib/format.js'
 
 const TERRAIN = { source: 'terrain', exaggeration: 1.25 }
 const MAX_H = 950
 const MAX_HEX = 1250
+const BLD_OP = 0.88
+const HEX_OP = 0.92
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export const isMobile = () => window.innerWidth < 760
@@ -50,7 +54,15 @@ const E = {
   discrete: null,
   flying: false,
   hovered: -1,
+  metro: null,
+  metroKey: '',
+  metroT: 0,
+  particles: null,
+  partKey: '',
+  partT: 0,
+  dimLast: -1,
 }
+export const getMetro = () => E.metro
 
 export const getMap = () => map
 
@@ -452,9 +464,44 @@ function frame(now) {
   const tk = `${s.dataset.version}|${E.elevKey}`
   if (s.intro === 'done' && tk !== E.tripsKey) { E.tripsKey = tk; E.trips = buildTrips(s.dataset, E.elev) }
 
+  // special views: the metro plan and the particles
+  const metroOn = s.intro === 'done' && s.view === 'metro'
+  const partOn = s.intro === 'done' && s.view === 'flujo'
+  // real elapsed time (not capped) so the transitions take the same time on slow machines
+  const rdt = Math.min(0.25, (now - (E.viewNow || now)) / 1000)
+  E.viewNow = now
+  E.metroT = clamp(E.metroT + (metroOn ? 1 : -1) * rdt * (reduceMotion ? 50 : 0.7))
+  E.partT = clamp(E.partT + (partOn ? 1 : -1) * rdt * (reduceMotion ? 50 : 1.1))
+  if (s.intro === 'done' && E.metroKey !== s.dataset.version) {
+    E.metroKey = s.dataset.version
+    E.metro = buildMetro(s.dataset)
+    useStore.setState({ metroLines: E.metro.lines.map((l) => ({ id: l.id, name: l.name, color: l.color, stations: l.stations, load: l.load })) })
+  }
+  const pday = Math.round(t) % STEPS
+  const pk = `${s.dataset.version}|${pday}`
+  if ((partOn || E.partT > 0) && E.partKey !== pk) {
+    E.partKey = pk
+    const seg = s.dataset.segF
+    const flows = seg ? Object.fromEntries(Object.keys(seg).filter((n) => s.segment === 'all' || n === s.segment).map((n) => [n, seg[n][pday]])) : { all: s.dataset.F[pday] }
+    const lite = document.documentElement.classList.contains('lowfx') || isMobile()
+    E.particles = buildParticles(flows, lite ? 7000 : 15000)
+    useStore.setState({ particleInfo: { perDot: E.particles.perDot, total: E.particles.total, segments: E.particles.segments } })
+  }
+  const dim = Math.max(smoothstep(E.metroT) * 0.9, smoothstep(E.partT) * 0.74)
+  if (Math.abs(dim - E.dimLast) > 0.004 || (dim === 0 && E.dimLast !== 0)) {
+    E.dimLast = dim
+    // 3D layers are drawn after flat ones, so they are faded directly instead of covered
+    const f = 1 - dim
+    map.setPaintProperty('metro-dim', 'background-opacity', dim)
+    map.setPaintProperty('barrios-3d', 'fill-extrusion-opacity', ['interpolate', ['linear'], ['zoom'], 11, 0.86 * f, 13.1, 0.8 * f, 14.6, 0.1 * f])
+    map.setPaintProperty('satellite', 'raster-brightness-max', 1 - dim * 0.8)
+    if (map.getLayer('buildings')) map.setPaintProperty('buildings', 'fill-extrusion-opacity', BLD_OP * f)
+    if (map.getLayer('hex-ext')) map.setPaintProperty('hex-ext', 'fill-extrusion-opacity', HEX_OP * f)
+  }
+
   const zoom = map.getZoom()
   if (Math.abs(zoom - s.zoom) > 0.05) useStore.setState({ zoom })
-  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow }) })
+  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow, metro: E.metro, metroT: E.metroT, particles: E.particles, partT: E.partT }) })
 
   // adaptive quality: on slow GPUs, drop the glass blur (the most expensive effect over a live map)
   if (s.intro === 'done' && !E.qualityDone) {
@@ -523,4 +570,15 @@ export async function capturePNG({ title, subtitle, legend }) {
   g.fillStyle = 'rgba(242,238,230,0.55)'
   g.fillText('Baburu · Datos de movilidad: Telefónica · Imágenes © Esri · © OpenStreetMap', 38 * k, H - 18 * k)
   return c.toDataURL('image/png')
+}
+
+/* ------------------------------------------------------------------ views */
+// mapa = the normal map · metro = the metro plan drawn from the demand · flujo = moving particles
+export function setView(view) {
+  const s = useStore.getState()
+  if (s.view === view) view = 'mapa'
+  useStore.setState({ view, metroFocus: -1, ...(view !== 'mapa' ? { sel: -1, orbit: false } : {}) })
+  if (view === 'metro') flyTo(isMobile() ? { center: [2.17, 41.405], zoom: 11.2, pitch: 0, bearing: 0 } : { center: [2.172, 41.403], zoom: 12.35, pitch: 0, bearing: 0 }, 2200)
+  else if (view === 'flujo') flyTo({ center: [2.165, 41.398], zoom: isMobile() ? 11.4 : 12.45, pitch: 48, bearing: -16 }, 2200)
+  else flyTo(HOME(), 2000)
 }

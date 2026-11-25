@@ -5,7 +5,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { visitorShares, shareRange } from '../model/derive.js'
 import { useStore } from '../store.js'
 import { zoomBy, resetNorth, togglePitch, getMap, flyPreset, PRESETS } from '../engine/mapEngine.js'
+import { Clapperboard } from 'lucide-react'
 import { legendFor } from '../lib/legend.js'
+import { BARRIOS } from '../model/geo.js'
+import { fmt, fmtK } from '../lib/format.js'
+import { PARTICLE_COLORS } from '../engine/particles.js'
 
 export function useLegend() {
   const st = useStore(useShallow((s) => ({
@@ -20,7 +24,55 @@ export function useLegend() {
   return legendFor({ ...st, visitorRange })
 }
 
+const WHO = { Residente: 'Residentes', Regional: 'Resto de Cataluña', Nacional: 'Resto de España', Internacional: 'Extranjero', all: 'Viajes' }
+
+function MetroLegend() {
+  const lines = useStore((s) => s.metroLines)
+  const focus = useStore((s) => s.metroFocus)
+  const setFocus = useStore((s) => s.setMetroFocus)
+  return (
+    <motion.div className="legend glass metro-legend" data-tour="legend" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <p className="eyebrow" style={{ marginBottom: 6 }}>Plano de la demanda</p>
+      <div className="ttl">Si Barcelona trazara su metro solo con estos datos</div>
+      <ul className="metro-lines">
+        {lines.map((l) => (
+          <li key={l.id}>
+            <button aria-pressed={focus === l.id} onMouseEnter={() => setFocus(l.id)} onMouseLeave={() => setFocus(-1)} onFocus={() => setFocus(l.id)} onBlur={() => setFocus(-1)}>
+              <span className="roundel" style={{ background: l.color, color: l.name === 'L4' ? '#17191C' : '#fff' }}>{l.name}</span>
+              <span className="ends-txt">{BARRIOS[l.stations[0]].short} <span aria-hidden="true">↔</span> {BARRIOS[l.stations[l.stations.length - 1]].short}</span>
+              <span className="vol">{fmtK(l.load)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="foot"><Info aria-hidden="true" /><span>Las 5 rutas entre barrios vecinos que más viajes acumulan. Cifra: viajes al día por tramo. No es el metro real.</span></div>
+    </motion.div>
+  )
+}
+
+function ParticleLegend() {
+  const info = useStore((s) => s.particleInfo)
+  if (!info) return null
+  return (
+    <motion.div className="legend glass" data-tour="legend" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <p className="eyebrow" style={{ marginBottom: 6 }}>Barcelona en movimiento</p>
+      <div className="ttl">Cada punto ≈ {fmt(info.perDot)} viajes reales</div>
+      <div className="comp-legend" style={{ marginTop: 4 }}>
+        {info.segments.map((n) => <span key={n}><i style={{ background: PARTICLE_COLORS[n], borderRadius: '50%' }} />{WHO[n] || n}</span>)}
+      </div>
+      <div className="foot"><Info aria-hidden="true" /><span>Van de su barrio de origen al de destino. Cambia de día en la línea de metro.</span></div>
+    </motion.div>
+  )
+}
+
 function Legend() {
+  const view = useStore((s) => s.view)
+  if (view === 'metro') return <MetroLegend />
+  if (view === 'flujo') return <ParticleLegend />
+  return <MapLegend />
+}
+
+function MapLegend() {
   const lg = useLegend()
   const bicing = useStore((s) => s.layers.bicing && s.bicing)
   const barrios = useStore((s) => s.layers.barrios)
@@ -87,6 +139,7 @@ export default function MapControls() {
         <AnimatePresence>
           {presets && (
             <motion.div className="presets glass" initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}>
+              <button onClick={() => { useStore.getState().setCinema({ active: true, idx: 0 }); setPresets(false) }}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Clapperboard size={15} /> Vuelo cinematográfico</span><span className="kbd">V</span></button>
               {Object.entries(PRESETS).map(([k, p], i) => (
                 <button key={k} onClick={() => { flyPreset(k); setPresets(false) }}>{p.label}<span className="kbd">{i + 1}</span></button>
               ))}
