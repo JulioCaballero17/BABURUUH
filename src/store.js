@@ -24,6 +24,11 @@ export const useStore = create((set, get) => ({
   summary: null, // average weekday arrivals for every period (monthly evolution, period comparison)
   comparePeriod: 'all', // reference period for the 'period' colour mode
   visitorKind: 'all', // 'all' = every non-resident | 'intl' = international visitors only
+  view: 'mapa', // mapa | metro (metro plan of the demand) | flujo (moving particles)
+  metroLines: [],
+  metroFocus: -1,
+  particleInfo: null,
+  cinema: { active: false, idx: 0 },
 
   // ---------- time (in days: 0 = Monday … 4 = Friday; fractional only while animating) ----------
   t: 0,
@@ -90,6 +95,8 @@ export const useStore = create((set, get) => ({
   },
   setComparePeriod: (comparePeriod) => set({ comparePeriod }),
   setVisitorKind: (visitorKind) => set({ visitorKind }),
+  setMetroFocus: (metroFocus) => set({ metroFocus }),
+  setCinema: (cinema) => set({ cinema }),
   loadSummary: async () => {
     try {
       const summary = await loadSummary()
@@ -156,6 +163,7 @@ export const useStore = create((set, get) => ({
         nDays: p.nDays,
       })
       ds.segArr = segmentArrivals(p) // every traveller type, whatever the filter (residents vs visitors view)
+      ds.segF = p.seg // raw flows per traveller type, for the particles
       set({ dataset: ds, period, segment, dataState: 'ok' })
     } catch (e) {
       if (seq !== loadSeq) return

@@ -74,12 +74,12 @@ export default function Tour() {
   const story = useStore((s) => s.story)
   const setStory = useStore((s) => s.setStory)
   const ds = useStore((s) => s.dataset)
-  const ctx = useStore(useShallow((s) => ({ summary: s.summary, periods: s.periods, period: s.period, segment: s.segment, comparePeriod: s.comparePeriod })))
+  const ctx = useStore(useShallow((s) => ({ summary: s.summary, periods: s.periods, period: s.period, segment: s.segment, comparePeriod: s.comparePeriod, metroLines: s.metroLines })))
   // texts are frozen when the tour starts, so they don't jump while a step changes the colour mode
   const frozen = useRef(null)
   const steps = useMemo(() => {
     if (!story.active) { frozen.current = null; return [] }
-    if (!frozen.current || frozen.current.ds !== ds || (!frozen.current.summary && ctx.summary)) frozen.current = { ds, summary: ctx.summary, steps: buildTour(ds, ctx) }
+    if (!frozen.current || frozen.current.ds !== ds || (!frozen.current.summary && ctx.summary) || (!frozen.current.metro && ctx.metroLines.length)) frozen.current = { ds, summary: ctx.summary, metro: ctx.metroLines.length, steps: buildTour(ds, ctx) }
     return frozen.current.steps
   }, [story.active, ds, ctx])
   const idx = Math.min(story.idx, Math.max(0, steps.length - 1))

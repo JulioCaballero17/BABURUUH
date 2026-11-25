@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, MapPin, CalendarDays, Play, Layers, Route, Database, Camera, Video, Hexagon, CircleDot, Waypoints, Triangle, Orbit, Users, CalendarRange, ChartColumnBig, Link2 } from 'lucide-react'
 import { downloadCapture, copyLink } from './TopBar.jsx'
+import { setView } from '../engine/mapEngine.js'
+import { TrainFront, Sparkles, Clapperboard } from 'lucide-react'
 import { useStore } from '../store.js'
 import { BARRIOS, normalizeName } from '../model/geo.js'
 import { DAYS } from '../lib/colors.js'
@@ -13,6 +15,9 @@ function actions() {
     ...DAYS.map((d, k) => ({ id: `day${k}`, group: 'Ir a', icon: CalendarDays, label: `${d.name}`, hint: `${k + 1}`, run: () => s.goDay(k) })),
     { id: 'play', group: 'Acciones', icon: Play, label: 'Reproducir la semana', hint: 'Espacio', run: () => { if (!useStore.getState().playing) s.togglePlay() } },
     { id: 'story', group: 'Acciones', icon: Route, label: 'Empezar el tour', hint: 'T', run: () => s.setStory({ active: true, idx: 0 }) },
+    { id: 'metro', group: 'Vistas', icon: TrainFront, label: 'Plano de metro de la demanda', hint: 'M', run: () => setView('metro') },
+    { id: 'flujo', group: 'Vistas', icon: Sparkles, label: 'Barcelona en movimiento', hint: 'E', run: () => setView('flujo') },
+    { id: 'vuelo', group: 'Vistas', icon: Clapperboard, label: 'Vuelo cinematográfico', hint: 'V', run: () => s.setCinema({ active: true, idx: 0 }) },
     { id: 'delta', group: 'Colorear', icon: Triangle, label: 'Comparar el día con el lunes', run: () => { s.setDeltaBase(0); s.setColorMode('delta') } },
     { id: 'period', group: 'Colorear', icon: CalendarRange, label: 'Comparar con otro periodo', run: () => { s.setColorMode('period'); s.openPanel('capas') } },
     { id: 'visitors', group: 'Colorear', icon: Users, label: 'Ver dónde llegan los visitantes', run: () => { s.setColorMode('visitors'); s.openPanel('capas') } },

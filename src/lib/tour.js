@@ -19,6 +19,8 @@ export const BASE = {
   panel: null,
   compareOpen: false,
   cmdk: false,
+  view: 'mapa',
+  metroFocus: -1,
   playing: false,
   layers: { flows: true, arcs: true, hex: false, bubbles: false, barrios: '3d', pulse: true },
 }
@@ -35,6 +37,8 @@ export function buildTour(ds, st) {
   const fri = [...elig].sort((a, b) => b.friE - a.friE)[0]
   const periodTxt = real ? ` (${ds.source.period.toLowerCase()})` : ''
   const months = st.periods.filter((p) => p.kind === 'month')
+  const ml = st.metroLines?.[0]
+  const metroTxt = ml ? `${ml.name}, va de ${BARRIOS[ml.stations[0]].short} a ${BARRIOS[ml.stations[ml.stations.length - 1]].short}` : 'la L1, cruza el centro'
 
   // international visitors
   const intl = visitorShares(ds, 2, 'intl')
@@ -99,6 +103,14 @@ export function buildTour(ds, st) {
       hint: 'Espacio para reproducir o pausar. Puedes elegir velocidad ½×, 1× o 2×.',
       target: 'play', badge: 'Reproducir', place: 'top-right',
       state: { t: 0, playing: true }, cam: { center: [2.165, 41.392], zoom: 12.6, pitch: 62, bearing: -12 },
+    },
+    {
+      id: 'flujo',
+      title: 'Barcelona en movimiento',
+      body: `Arriba, **En movimiento** convierte los datos en miles de puntos de luz. Cada punto es un grupo de viajes reales que va de su barrio de origen al de destino, y **el color dice quién viaja**: residentes, visitantes de Cataluña, del resto de España o del extranjero.`,
+      hint: 'Atajo: tecla E. Cambia de día en la línea de metro y el flujo cambia.',
+      target: 'view-flujo', badge: 'Nuevo · En movimiento', place: 'top-right',
+      state: { t: 1, view: 'flujo' }, cam: { center: [2.165, 41.398], zoom: 12.45, pitch: 48, bearing: -16 },
     },
     {
       id: 'periodo',
@@ -202,6 +214,22 @@ export function buildTour(ds, st) {
         : 'Aquí contrastamos la pregunta inicial del proyecto: ¿los barrios con más restaurantes retienen a su gente? El panel explica qué falta en los datos para medirla del todo (viajes dentro del mismo barrio).',
       target: 'panel', badge: 'Burbujas', place: 'top-right',
       state: { t: 1, panel: 'estudio' }, cam: HOME,
+    },
+    {
+      id: 'metro-plan',
+      title: 'El metro que pide Barcelona',
+      body: `**Metro** redibuja la ciudad como un plano de metro. Las cinco líneas no son las reales: son **las rutas entre barrios vecinos que más viajes acumulan** según estos datos. La más cargada, **${metroTxt}**. Los trenes van más llenos los días con más movimiento.`,
+      hint: 'Pasa el cursor por una línea de la leyenda para aislarla. Atajo: tecla M.',
+      target: 'view-metro', badge: 'Nuevo · Metro', place: 'top-right',
+      state: { t: 1, view: 'metro' }, cam: { center: [2.172, 41.403], zoom: 12.35, pitch: 0, bearing: 0 },
+    },
+    {
+      id: 'vuelo',
+      title: 'Un vuelo por la ciudad',
+      body: 'El botón de la claqueta lanza un **vuelo cinematográfico**: la interfaz desaparece y la cámara recorre los barrios con más llegadas, el flujo de viajes y el plano de metro, con rótulos escritos a partir de los datos. Ideal para abrir una presentación.',
+      hint: 'Atajo: tecla V. Esc para salir.',
+      target: 'cinema-btn', badge: 'Nuevo · Vuelo', place: 'top-right',
+      state: { t: 1 }, cam: { center: [2.163, 41.392], zoom: 11.9, pitch: 60, bearing: -38 },
     },
     {
       id: 'buscar',

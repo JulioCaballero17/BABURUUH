@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route } from 'lucide-react'
+import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route, Map as MapIcon, TrainFront, Sparkles, Clapperboard } from 'lucide-react'
+import { setView } from '../engine/mapEngine.js'
 import { useStore, selectDark } from '../store.js'
 import { BrandMark } from './ui/primitives.jsx'
 import { capturePNG } from '../engine/mapEngine.js'
@@ -32,6 +33,25 @@ export async function copyLink() {
   }
 }
 
+const VIEWS = [
+  { key: 'mapa', label: 'Mapa', icon: MapIcon, title: 'Mapa de barrios' },
+  { key: 'metro', label: 'Metro', icon: TrainFront, title: 'Plano de metro de la demanda (M)' },
+  { key: 'flujo', label: 'En movimiento', icon: Sparkles, title: 'Barcelona en movimiento (E)' },
+]
+function ViewSwitch() {
+  const view = useStore((s) => s.view)
+  return (
+    <nav className="views glass" aria-label="Vista" data-tour="views">
+      {VIEWS.map((v) => (
+        <button key={v.key} data-tour={`view-${v.key}`} aria-pressed={view === v.key} onClick={() => setView(v.key === view ? 'mapa' : v.key)} title={v.title}>
+          {view === v.key && <motion.span layoutId="view-thumb" className="view-thumb" transition={{ type: 'spring', stiffness: 480, damping: 38 }} />}
+          <v.icon aria-hidden="true" /> <span className="lbl">{v.label}</span>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 export default function TopBar() {
   const setCmdk = useStore((s) => s.setCmdk)
   const dark = useStore(selectDark)
@@ -51,6 +71,7 @@ export default function TopBar() {
           <div className="brand-meta"><span className="dot live" /> {dataState === 'loading' ? 'Cargando datos…' : source.label}</div>
         </div>
       </div>
+      <ViewSwitch />
       <div className="actions glass" data-tour="actions">
         <button className="search-btn" data-tour="search" onClick={() => setCmdk(true)} aria-label="Buscar barrio o acción">
           <Search /> <span className="lbl">Buscar un barrio o una acción</span> <span className="kbd">Ctrl K</span>
@@ -58,6 +79,7 @@ export default function TopBar() {
         <button className="tour-btn" data-tour="tour-btn" onClick={() => setStory({ active: !tourOn, idx: 0 })} aria-pressed={tourOn} title="Recorrido por todas las funciones (T)">
           <Route aria-hidden="true" /> {tourOn ? <>Salir<span className="hide-m"> del tour</span></> : 'Tour'}
         </button>
+        <button className="icon-btn hide-m" data-tour="cinema-btn" onClick={() => useStore.getState().setCinema({ active: true, idx: 0 })} aria-label="Vuelo cinematográfico" title="Vuelo cinematográfico (V)"><Clapperboard /></button>
         <span className="divider-v" />
         <button className="icon-btn hide-m" data-tour="capture" onClick={downloadCapture} aria-label="Descargar captura del mapa" title="Descargar captura (P)"><Camera /></button>
         <button className="icon-btn hide-m" data-tour="share" onClick={copyLink} aria-label="Copiar enlace a esta vista" title="Copiar enlace a esta vista"><Link2 /></button>

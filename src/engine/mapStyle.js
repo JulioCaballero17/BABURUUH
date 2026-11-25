@@ -184,6 +184,8 @@ export function buildStyle() {
           'text-opacity': ['interpolate', ['linear'], ['zoom'], 12.2, 0, 12.6, 0.95],
         },
       },
+      // darkens the whole map behind the metro plan and the moving particles
+      { id: 'metro-dim', type: 'background', paint: { 'background-color': '#0E1012', 'background-opacity': 0 } },
     ],
   }
 }

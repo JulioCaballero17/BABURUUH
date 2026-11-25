@@ -13,6 +13,7 @@ import MapControls from './components/MapControls.jsx'
 import Dock from './components/Dock.jsx'
 import Tooltip from './components/Tooltip.jsx'
 import Tour from './components/Tour.jsx'
+import Cinema from './components/Cinema.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import CompareModal from './components/CompareModal.jsx'
 import { HelpOverlay, Toasts } from './components/Overlays.jsx'
@@ -40,6 +41,7 @@ useStore.getState().loadReal().then(() => useStore.getState().loadSummary())
 export default function App() {
   const dark = useStore(selectDark)
   const intro = useStore((s) => s.intro)
+  const cinema = useStore((s) => s.cinema.active)
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light'
@@ -51,7 +53,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="app">
+      <div className={`app ${cinema ? 'cinema' : ''}`}>
         <MapCanvas startCam={HASH?.cam} />
         <Intro />
         {intro === 'done' && (
@@ -64,6 +66,7 @@ export default function App() {
             <Dock />
             <Tooltip />
             <Tour />
+            <Cinema />
             <CommandPalette />
             <CompareModal />
             <HelpOverlay />
