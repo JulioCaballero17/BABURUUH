@@ -1,39 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Minus, Compass, Box, Orbit, Video, Info, ArrowUpFromLine } from 'lucide-react'
+import { Plus, Minus, Compass, Box, Orbit, Video, Info, ArrowUpFromLine, Satellite, Map as MapIcon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
-import { visitorShares, shareRange } from '../model/derive.js'
 import { useStore } from '../store.js'
 import { zoomBy, resetNorth, togglePitch, getMap, flyPreset, PRESETS } from '../engine/mapEngine.js'
-import { Clapperboard } from 'lucide-react'
+import { getVisitors } from '../engine/toolState.js'
 import { legendFor } from '../lib/legend.js'
 import { BARRIOS } from '../model/geo.js'
-import { fmt, fmtK } from '../lib/format.js'
-import { PARTICLE_COLORS } from '../engine/particles.js'
+import { fmtK } from '../lib/format.js'
 
 export function useLegend() {
   const st = useStore(useShallow((s) => ({
-    colorMode: s.colorMode, deltaBase: s.deltaBase, sel: s.sel, influenceDir: s.influenceDir, t: Math.round(s.t) % 5,
-    periods: s.periods, period: s.period, comparePeriod: s.comparePeriod, dataState: s.dataState, visitorKind: s.visitorKind, dataset: s.dataset,
+    view: s.view, colorMode: s.colorMode, sel: s.sel, t: Math.round(s.t) % 5, business: s.business,
+    visitorKind: s.visitorKind, dataset: s.dataset,
   })))
   let visitorRange = null
-  if (st.colorMode === 'visitors') {
-    const sh = visitorShares(st.dataset, st.t, st.visitorKind)
-    if (sh) visitorRange = shareRange(sh, st.dataset, st.t)
+  if (st.view === 'turismo') {
+    const v = getVisitors(useStore.getState())
+    if (v) visitorRange = [v.lo, v.hi]
   }
   return legendFor({ ...st, visitorRange })
 }
 
-const WHO = { Residente: 'Residentes', Regional: 'Resto de Cataluña', Nacional: 'Resto de España', Internacional: 'Extranjero', all: 'Viajes' }
-
 function MetroLegend() {
   const lines = useStore((s) => s.metroLines)
+  const variant = useStore((s) => s.metroVariant)
   const focus = useStore((s) => s.metroFocus)
   const setFocus = useStore((s) => s.setMetroFocus)
   return (
     <motion.div className="legend glass metro-legend" data-tour="legend" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <p className="eyebrow" style={{ marginBottom: 6 }}>Plano de la demanda</p>
-      <div className="ttl">Si Barcelona trazara su metro solo con estos datos</div>
+      <p className="eyebrow" style={{ marginBottom: 6 }}>{variant === 'visit' ? 'Plano de los visitantes' : 'Plano de la demanda'}</p>
+      <div className="ttl">{variant === 'visit' ? 'El metro que trazarían solo los visitantes' : 'Si Barcelona trazara su metro solo con estos datos'}</div>
+      {variant === 'visit' && <button className="btn sm ghost" style={{ marginBottom: 6 }} onClick={() => useStore.setState({ metroVariant: 'all' })}>Ver el de todos los viajeros</button>}
       <ul className="metro-lines">
         {lines.map((l) => (
           <li key={l.id}>
@@ -50,25 +48,9 @@ function MetroLegend() {
   )
 }
 
-function ParticleLegend() {
-  const info = useStore((s) => s.particleInfo)
-  if (!info) return null
-  return (
-    <motion.div className="legend glass" data-tour="legend" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <p className="eyebrow" style={{ marginBottom: 6 }}>Barcelona en movimiento</p>
-      <div className="ttl">Cada punto ≈ {fmt(info.perDot)} viajes reales</div>
-      <div className="comp-legend" style={{ marginTop: 4 }}>
-        {info.segments.map((n) => <span key={n}><i style={{ background: PARTICLE_COLORS[n], borderRadius: '50%' }} />{WHO[n] || n}</span>)}
-      </div>
-      <div className="foot"><Info aria-hidden="true" /><span>Van de su barrio de origen al de destino. Cambia de día en la línea de metro.</span></div>
-    </motion.div>
-  )
-}
-
 function Legend() {
   const view = useStore((s) => s.view)
   if (view === 'metro') return <MetroLegend />
-  if (view === 'flujo') return <ParticleLegend />
   return <MapLegend />
 }
 
@@ -106,6 +88,7 @@ function MapLegend() {
 export default function MapControls() {
   const sel = useStore((s) => s.sel)
   const orbit = useStore((s) => s.orbit)
+  const basemap = useStore((s) => s.basemap)
   const setOrbit = useStore((s) => s.setOrbit)
   const [presets, setPresets] = useState(false)
   const compass = useRef(null)
@@ -135,11 +118,11 @@ export default function MapControls() {
         <button className="icon-btn" onClick={resetNorth} aria-label="Orientar al norte" title="Orientar al norte"><Compass ref={compass} className="compass" /></button>
         <button className="icon-btn" onClick={togglePitch} aria-label="Cambiar entre vista 2D y 3D" title="2D / 3D"><Box /></button>
         <button className="icon-btn" aria-pressed={orbit} onClick={() => setOrbit(!orbit)} aria-label="Órbita automática" title="Órbita automática (O)"><Orbit /></button>
+        <button className="icon-btn" onClick={() => useStore.getState().setBasemap(basemap === 'satelite' ? 'mapa' : 'satelite')} aria-label={basemap === 'satelite' ? 'Cambiar a plano' : 'Cambiar a satélite'} title={basemap === 'satelite' ? 'Ver plano' : 'Ver satélite'}>{basemap === 'satelite' ? <MapIcon /> : <Satellite />}</button>
         <button className="icon-btn" aria-expanded={presets} onClick={() => setPresets((p) => !p)} aria-label="Cámaras" title="Cámaras"><Video /></button>
         <AnimatePresence>
           {presets && (
             <motion.div className="presets glass" initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}>
-              <button onClick={() => { useStore.getState().setCinema({ active: true, idx: 0 }); setPresets(false) }}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Clapperboard size={15} /> Vuelo cinematográfico</span><span className="kbd">V</span></button>
               {Object.entries(PRESETS).map(([k, p], i) => (
                 <button key={k} onClick={() => { flyPreset(k); setPresets(false) }}>{p.label}<span className="kbd">{i + 1}</span></button>
               ))}

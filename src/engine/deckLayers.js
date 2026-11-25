@@ -2,7 +2,6 @@ import { TripsLayer } from '@deck.gl/geo-layers'
 import { ArcLayer, ScatterplotLayer, LineLayer, PathLayer, TextLayer } from '@deck.gl/layers'
 import { BARRIOS, N, DM, toKm, toLL } from '../model/geo.js'
 import { along } from './metro.js'
-import { PERIOD } from './particles.js'
 import { STEPS } from '../model/simulate.js'
 import { DAYS, hexToRgb, mix } from '../lib/colors.js'
 import { lerpArr, topFrom, topTo, stepOf } from '../model/derive.js'
@@ -56,38 +55,34 @@ export function buildTrips(ds, elev) {
   return trips
 }
 
-export function buildDeckLayers({ s, trips, elev, now, zoom, grow, metro, metroT = 0, particles, partT = 0 }) {
+export function buildDeckLayers({ s, trips, elev, now, zoom, grow, metro, metroT = 0, sim }) {
   const out = []
   if (s.intro !== 'done') return out
   const { t, layers, dataset: ds, sel, colorMode, influenceDir } = s
   const day = stepOf(t)
   const tod = (now / 1000) % 1000
 
-  if (partT > 0.01 && particles?.trips.length) {
-    out.push(new TripsLayer({
-      id: 'particles',
-      data: particles.trips,
-      getPath: (d) => d.path,
-      getTimestamps: (d) => d.ts,
-      getColor: (d) => d.color,
-      getWidth: 2.2,
+  if (sim && sim.flows.length) {
+    const vmax = Math.abs(sim.flows[0].v) || 1
+    out.push(new ArcLayer({
+      id: 'sim-arcs',
+      data: sim.flows,
+      getSourcePosition: (o) => [...BARRIOS[o.i].c, elev[o.i] || 0],
+      getTargetPosition: (o) => [...BARRIOS[o.j].c, elev[o.j] || 0],
+      getSourceColor: (o) => (o.v > 0 ? [255, 199, 44, 90] : [124, 158, 228, 90]),
+      getTargetColor: (o) => (o.v > 0 ? [255, 199, 44, 245] : [31, 79, 191, 245]),
+      getWidth: (o) => 1.5 + 9 * Math.sqrt(Math.abs(o.v) / vmax),
+      getHeight: 0.45,
       widthUnits: 'pixels',
-      widthMinPixels: 1.6,
-      capRounded: true,
-      jointRounded: true,
-      fadeTrail: true,
-      trailLength: 1.1,
-      currentTime: ((now / 1000) * 1.7) % PERIOD,
-      opacity: partT,
-      parameters: { depthCompare: 'always', blend: true, blendColorOperation: 'add', blendColorSrcFactor: 'src-alpha', blendColorDstFactor: 'one', blendAlphaOperation: 'add', blendAlphaSrcFactor: 'one', blendAlphaDstFactor: 'one' },
+      updateTriggers: { getWidth: sim, getSourcePosition: sim, getTargetPosition: sim, getSourceColor: sim, getTargetColor: sim },
     }))
   }
   if (metroT > 0.01 && metro) {
     out.push(...metroLayers({ s, metro, metroT, now, zoom, day }))
   }
-  if (metroT > 0.5 || partT > 0.5) return out
+  if (metroT > 0.5) return out
 
-  if (layers.flows && trips) {
+  if (layers.flows && trips && s.view === 'mapa') {
     const currentTime = day * 60 + ((tod * 9) % 60)
     out.push(new TripsLayer({
       id: 'trips',

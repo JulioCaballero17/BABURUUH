@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, MapPin, CalendarDays, Play, Layers, Route, Database, Camera, Video, Hexagon, CircleDot, Waypoints, Triangle, Orbit, Users, CalendarRange, ChartColumnBig, Link2 } from 'lucide-react'
-import { downloadCapture, copyLink } from './TopBar.jsx'
+import { Search, MapPin, CalendarDays, Play, Route, Camera, Video, Orbit, Link2, Store, FlaskConical } from 'lucide-react'
+import { downloadCapture, copyLink, VIEWS } from './TopBar.jsx'
 import { setView } from '../engine/mapEngine.js'
-import { TrainFront, Sparkles, Clapperboard } from 'lucide-react'
+import { BUSINESSES, SCENARIOS } from '../model/tools.js'
 import { useStore } from '../store.js'
 import { BARRIOS, normalizeName } from '../model/geo.js'
 import { DAYS } from '../lib/colors.js'
@@ -12,23 +12,14 @@ import { selectBarrio, flyPreset, PRESETS } from '../engine/mapEngine.js'
 function actions() {
   const s = useStore.getState()
   return [
+    ...VIEWS.map((v) => ({ id: `view-${v.key}`, group: 'Ver', icon: v.icon, label: v.label, hint: v.kb, run: () => setView(v.key) })),
     ...DAYS.map((d, k) => ({ id: `day${k}`, group: 'Ir a', icon: CalendarDays, label: `${d.name}`, hint: `${k + 1}`, run: () => s.goDay(k) })),
     { id: 'play', group: 'Acciones', icon: Play, label: 'Reproducir la semana', hint: 'Espacio', run: () => { if (!useStore.getState().playing) s.togglePlay() } },
     { id: 'story', group: 'Acciones', icon: Route, label: 'Empezar el tour', hint: 'T', run: () => s.setStory({ active: true, idx: 0 }) },
-    { id: 'metro', group: 'Vistas', icon: TrainFront, label: 'Plano de metro de la demanda', hint: 'M', run: () => setView('metro') },
-    { id: 'flujo', group: 'Vistas', icon: Sparkles, label: 'Barcelona en movimiento', hint: 'E', run: () => setView('flujo') },
-    { id: 'vuelo', group: 'Vistas', icon: Clapperboard, label: 'Vuelo cinematográfico', hint: 'V', run: () => s.setCinema({ active: true, idx: 0 }) },
-    { id: 'delta', group: 'Colorear', icon: Triangle, label: 'Comparar el día con el lunes', run: () => { s.setDeltaBase(0); s.setColorMode('delta') } },
-    { id: 'period', group: 'Colorear', icon: CalendarRange, label: 'Comparar con otro periodo', run: () => { s.setColorMode('period'); s.openPanel('capas') } },
-    { id: 'visitors', group: 'Colorear', icon: Users, label: 'Ver dónde llegan los visitantes', run: () => { s.setColorMode('visitors'); s.openPanel('capas') } },
-    { id: 'bubble', group: 'Colorear', icon: CircleDot, label: 'Colorear por índice de burbuja', run: () => s.setColorMode('bubble') },
-    { id: 'inf', group: 'Colorear', icon: Waypoints, label: 'Ver influencia del barrio seleccionado', run: () => s.setColorMode('influence') },
-    { id: 'hex', group: 'Acciones', icon: Hexagon, label: 'Activar o quitar la colmena 3D', run: () => s.setLayer('hex', !useStore.getState().layers.hex) },
-    { id: 'orbit', group: 'Acciones', icon: Orbit, label: 'Órbita automática', hint: 'O', run: () => s.setOrbit(!useStore.getState().orbit) },
-    { id: 'layers', group: 'Paneles', icon: Layers, label: 'Mapa: capas y colores', run: () => s.openPanel('capas') },
-    { id: 'rank', group: 'Paneles', icon: ChartColumnBig, label: 'Análisis: ranking de barrios', run: () => s.openPanel('ranking') },
-    { id: 'data', group: 'Paneles', icon: Database, label: 'Datos: periodo y tipo de viajero', run: () => s.openPanel('datos') },
+    ...BUSINESSES.map((b) => ({ id: `biz-${b.key}`, group: 'Dónde abrir', icon: Store, label: `Dónde abrir: ${b.label.toLowerCase()}`, run: () => { setView('abrir'); s.setBusiness(b.key) } })),
+    ...SCENARIOS.map((x) => ({ id: `sc-${x.key}`, group: 'Simulador', icon: FlaskConical, label: `Simular: ${x.label.toLowerCase()}`, run: () => { setView('simular'); s.setScenario(x.key) } })),
     ...useStore.getState().periods.filter((p) => p.kind !== 'month').map((p) => ({ id: `per-${p.id}`, group: 'Periodo', icon: CalendarDays, label: `Periodo: ${p.label}`, run: () => s.setPeriod(p.id) })),
+    { id: 'orbit', group: 'Acciones', icon: Orbit, label: 'Órbita automática', hint: 'O', run: () => s.setOrbit(!useStore.getState().orbit) },
     { id: 'shot', group: 'Acciones', icon: Camera, label: 'Descargar captura del mapa', hint: 'P', run: downloadCapture },
     { id: 'link', group: 'Acciones', icon: Link2, label: 'Copiar enlace a esta vista', run: copyLink },
     ...Object.entries(PRESETS).map(([k, p]) => ({ id: `cam-${k}`, group: 'Cámara', icon: Video, label: `Cámara: ${p.label}`, run: () => flyPreset(k) })),

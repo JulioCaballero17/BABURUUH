@@ -46,62 +46,45 @@ regenerar el resumen a partir de los JSON ya creados: `node scripts/build-summar
 - Los acentos de los ficheros son UTF-8 correcto; si en Excel se ven como «GrÃ cia», es Excel abriéndolos
   con otra codificación (usar Datos → Desde texto/CSV → UTF-8).
 
-## Qué puedes hacer
+## Qué hace Baburu
 
-- **Tour** (botón amarillo arriba o tecla `T`): 19 pasos que muestran cada función. En cada paso la app se coloca sola
-  (día, panel, colores, barrio, cámara) y un anillo amarillo señala el control del que se habla. Los textos se escriben
-  con los datos cargados. Avanza con `→`, `Espacio`, `Intro` o un mando de presentaciones; `←` vuelve; `F` pantalla
-  completa; `Esc` sale.
-- **Línea de metro**: cada parada es un día laborable con su número de viajes. Reproducción a tres velocidades.
-- **Periodo y tipo de viajero** en la barra inferior: cualquier mes, año o el total; residentes o visitantes.
-- **Seis lecturas del mapa** (panel Mapa): actividad, cambio entre días, **cambio entre periodos** (nuevo),
-  **visitantes** (nuevo: parte de quien llega que no vive en Barcelona, o solo internacionales), influencia de un
-  barrio y burbuja. La **leyenda** está siempre visible y explica qué significa el color en cada modo.
-- **Capas**: columnas 3D o plano, colmena 3D, viajes animados, arcos, burbujas, pulso, relieve, edificios, calles.
-  Mapa base satélite o **plano** (vectorial, claro u oscuro).
-- **Ficha de barrio**: llegadas, día fuerte, **evolución mes a mes** (nuevo, clic en un mes para cargarlo),
-  **quién llega** (nuevo: residentes y visitantes de Cataluña, España y extranjero), destinos y orígenes, y su «ADN».
-- **Comparador** de dos barrios.
-- **Análisis**: ranking del día, diagrama de cuerdas entre distritos, hipótesis de la burbuja y hallazgos automáticos.
-- **Tus datos**: arrastra un CSV y todo se recalcula. Exporta métricas y flujos en CSV.
-- **Captura PNG** con leyenda y **enlace** que reproduce exactamente la vista.
-- **Búsqueda** de barrios y acciones con `Ctrl K`.
-- Bicing en directo (opcional, en Capas).
+Cinco modos, arriba en el centro. Cada uno responde a una sola pregunta:
+
+- **La semana** (`S`): cómo se mueve la ciudad cada día laborable. Columnas 3D por barrio (llegadas por km²),
+  trayectos más fuertes animados y la semana como **línea de metro** abajo (con reproducción). Clic en un barrio:
+  su ficha con evolución mes a mes, quién llega y adónde va su gente.
+- **Metro** (`M`): el plano de metro que dibujaría la demanda. Cinco líneas (colores L1–L5) que siguen las rutas
+  entre barrios vecinos con más viajes; trenes que se mueven según el día. No es el metro real.
+- **Dónde abrir** (`A`): eliges un tipo de negocio (restauración y ocio, tienda para turistas, servicios para quien
+  trabaja, comercio de barrio) y cada barrio recibe una puntuación de encaje; podio con los tres mejores y por qué.
+- **Simulador** (`X`): ¿qué pasa si…? Gran evento (asistentes y barrio, clic en el mapa para moverlo), cierre de un
+  barrio por obras o más teletrabajo. El mapa muestra qué barrios ganan o pierden gente y de dónde sale.
+  Es una estimación a partir de los patrones reales.
+- **Turismo** (`U`): parte de quien llega que es visitante (todos, extranjero, resto de España o de Cataluña),
+  la temporada mes a mes, los barrios más turísticos y más de vecinos, y el metro dibujado solo por los visitantes.
+
+El periodo y el tipo de viajero se eligen en la barra inferior y afectan a todos los modos.
+
+**Tour** (`T`): 15 pasos por todos los modos, pensados para presentar. Avanza con `→`, `Espacio`, `Intro` o un mando
+de presentaciones; `F` pantalla completa; `Esc` sale.
+
+Todo se calcula solo con los datos de movilidad de Telefónica (y la población de cada barrio).
 
 ## Atajos
 
 | Tecla | Acción |
 |---|---|
+| S · M · A · X · U | La semana · Metro · Dónde abrir · Simulador · Turismo |
 | T | Empezar o salir del tour |
 | Espacio | Reproducir / pausar |
 | 1 – 5 | Ir de lunes a viernes |
-| ← → | Día anterior / siguiente (en el tour: paso anterior / siguiente) |
+| ← → | Día anterior / siguiente |
 | Ctrl K o / | Buscar |
-| L | Mapa: capas y colores |
-| R G B N | Análisis: ranking, distritos, burbujas, hallazgos |
-| I | Datos |
-| D | Comparar el día con el lunes |
 | O | Órbita automática |
 | H | Vista inicial |
 | P | Captura |
-| C | Comparar el barrio seleccionado |
+| Esc | Cerrar / volver a La semana |
 | ? | Ayuda |
-
-## Formato de un CSV propio
-
-```csv
-origen,destino,dia,viajes
-Sants,la Vila de Gràcia,Lunes,4120
-31,7,Martes,3500
-```
-
-- `origen` / `destino`: nombre oficial del barrio (con o sin artículo), su código 1–73 o el código oficial `080190101`.
-  En los ficheros originales se usan `barrio_origen` / `barrio_destino` (la columna `origen` es el tipo de viajero).
-- `dia`: lunes…viernes (también `dl`, `monday`, `1` = lunes) o una fecha. Si hay varias semanas, se promedian.
-- `viajes`: número de viajes. Si falta la columna, cada fila cuenta como 1.
-
-**Atributos** (opcional): `barrio,poblacion,restaurantes`. Los restaurantes pueden ir en número absoluto
-(se convierten a «por 1.000 habitantes») o ya normalizados. Ambas plantillas se descargan desde el panel Datos.
 
 > Si no se encuentran los datos de `public/data/movilidad`, la app usa datos **simulados** (modelo de gravedad).
 
@@ -112,15 +95,15 @@ Sants,la Vila de Gràcia,Lunes,4120
 - Edificios y tipografías del mapa: OpenFreeMap, OpenMapTiles, © OpenStreetMap.
 - Plano y rotulación: OpenFreeMap, OpenMapTiles, © OpenStreetMap (sin clave de API).
 - Límites de barrios: Ajuntament de Barcelona (Open Data BCN), vía martgnz/bcn-geodata.
-- Datos de movilidad: Telefónica (Càtedra Telefónica, UPF). Bicing: CityBikes API.
+- Datos de movilidad: Telefónica (Càtedra Telefónica, UPF).
 
 ## Estructura
 
 ```
 src/
   engine/        mapa (MapLibre + deck.gl), estilo, capas y bucle de animación
-  model/         geometría, carga de datos reales, simulación, métricas diarias, importación CSV
-  components/    interfaz (barra superior, navegación, paneles, ficha, línea de metro, tour, modales)
+  model/         geometría, carga de datos reales, métricas diarias y herramientas (tools.js)
+  components/    interfaz (barra superior con los modos, paneles de herramientas, ficha, línea de metro, tour)
   lib/           colores, leyenda, pasos del tour, APIs, URL compartible
   store.js       estado global (zustand)
 scripts/

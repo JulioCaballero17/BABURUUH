@@ -57,7 +57,7 @@ function Spotlight({ target, badge }) {
     <>
       <div className="tour-ring" style={rect} aria-hidden="true" />
       {badge && (rect.top < 110
-        ? <div className="tour-badge inside" style={{ left: rect.left + 14, top: rect.top + 14 }} aria-hidden="true">{badge}</div>
+        ? <div className="tour-badge below" style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height + 12 }} aria-hidden="true">{badge}</div>
         : <div className="tour-badge" style={{ left: rect.left + rect.width / 2, top: rect.top }} aria-hidden="true">{badge}</div>)}
     </>
   )
@@ -67,14 +67,14 @@ function placeStyle(place) {
   const g = 'var(--gap)'
   if (place === 'top-right') return { right: g, top: `calc(${g} * 2 + var(--top-h))` }
   if (place === 'bottom-right') return { right: g, bottom: `calc(${g} * 2 + var(--dock-h))` }
-  return { left: `calc(${g} * 2 + var(--rail-w))`, bottom: `calc(${g} * 2 + var(--dock-h))` }
+  return { left: g, bottom: `calc(${g} * 2 + var(--dock-h))` }
 }
 
 export default function Tour() {
   const story = useStore((s) => s.story)
   const setStory = useStore((s) => s.setStory)
   const ds = useStore((s) => s.dataset)
-  const ctx = useStore(useShallow((s) => ({ summary: s.summary, periods: s.periods, period: s.period, segment: s.segment, comparePeriod: s.comparePeriod, metroLines: s.metroLines })))
+  const ctx = useStore(useShallow((s) => ({ summary: s.summary, periods: s.periods, period: s.period, segment: s.segment, metroLines: s.metroLines })))
   // texts are frozen when the tour starts, so they don't jump while a step changes the colour mode
   const frozen = useRef(null)
   const steps = useMemo(() => {

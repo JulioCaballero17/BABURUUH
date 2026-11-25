@@ -1,42 +1,34 @@
-import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, DAYS } from './colors.js'
+import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_INFLUENCE, RAMP_VISITORS, RAMP_SCORE, DAYS } from './colors.js'
 import { BARRIOS } from '../model/geo.js'
+import { BUSINESSES, VISITOR_KINDS } from '../model/tools.js'
 
 export const MODES = {
-  activity: { label: 'Actividad', desc: 'Cuánta gente llega a cada barrio ese día', ramp: RAMP_ACTIVITY },
-  delta: { label: 'Cambio entre días', desc: 'Llegadas comparadas con otro día de la semana', ramp: RAMP_DELTA },
-  period: { label: 'Cambio entre periodos', desc: 'Llegadas comparadas con otro mes o año', ramp: RAMP_DELTA },
-  visitors: { label: 'Visitantes', desc: 'Qué parte de quien llega viene de fuera de Barcelona', ramp: RAMP_VISITORS },
-  influence: { label: 'Influencia', desc: 'Adónde va (o de dónde viene) la gente de un barrio', ramp: RAMP_INFLUENCE },
-  bubble: { label: 'Burbuja', desc: 'Viajes que no salen del barrio', ramp: RAMP_BUBBLE },
+  activity: { label: 'Actividad', ramp: RAMP_ACTIVITY },
+  influence: { label: 'Influencia', ramp: RAMP_INFLUENCE },
+  score: { label: 'Dónde abrir', ramp: RAMP_SCORE },
+  sim: { label: 'Simulador', ramp: RAMP_DELTA },
+  visitors: { label: 'Turismo', ramp: RAMP_VISITORS },
 }
 
 const pctTxt = (v) => `${Math.round(v * 100)} %`
 
 // What the colour (and the height) of the barrios means right now, in plain words.
 export function legendFor(s) {
-  const m = MODES[s.colorMode] || MODES.activity
   const day = DAYS[Math.round(s.t ?? 0) % 5].name.toLowerCase()
-  const height = 'Altura: llegadas por km²'
-  if (s.colorMode === 'delta') {
-    return { title: `${DAYS[Math.round(s.t ?? 0) % 5].name} frente al ${DAYS[s.deltaBase].name.toLowerCase()}`, ramp: m.ramp, min: '−50 % o menos', mid: 'Igual', max: '+100 % o más', note: height }
+  if (s.view === 'abrir') {
+    const b = BUSINESSES.find((x) => x.key === s.business) || BUSINESSES[0]
+    return { title: `Encaje para ${b.label.toLowerCase()}`, ramp: RAMP_SCORE, min: 'Peor', max: 'Mejor', note: 'Altura: los mejores barrios destacan' }
   }
-  if (s.colorMode === 'period') {
-    const ref = s.periods?.find((p) => p.id === s.comparePeriod)?.label || 'otro periodo'
-    const cur = s.periods?.find((p) => p.id === s.period)?.label || 'este periodo'
-    if (s.dataState === 'csv') return { title: 'Cambio entre periodos', ramp: m.ramp, min: '', max: '', note: 'Solo disponible con los datos de Telefónica' }
-    return { title: `${cur} frente a ${ref}`, ramp: m.ramp, min: '−50 % o menos', mid: 'Igual', max: '+100 % o más', note: 'Media de llegadas de lunes a viernes' }
+  if (s.view === 'simular') {
+    return { title: `Llegadas simuladas frente a un ${day} normal`, ramp: RAMP_DELTA, min: 'Menos gente', mid: 'Igual', max: 'Más gente', note: 'Arcos: de dónde sale o adónde se desvía la gente' }
   }
-  if (s.colorMode === 'visitors') {
-    if (!s.visitorRange) return { title: 'Visitantes', ramp: m.ramp, min: '', max: '', note: 'Este conjunto de datos no distingue tipos de viajero' }
-    const who = s.visitorKind === 'intl' ? 'visitantes internacionales' : 'visitantes (Cataluña, España y extranjero)'
-    return { title: `Llegadas de ${who} · ${day}`, ramp: m.ramp, min: pctTxt(s.visitorRange[0]), max: pctTxt(s.visitorRange[1]), note: height }
+  if (s.view === 'turismo') {
+    const k = VISITOR_KINDS.find((x) => x.key === s.visitorKind) || VISITOR_KINDS[0]
+    if (!s.visitorRange) return { title: 'Visitantes', ramp: RAMP_VISITORS, min: '', max: '', note: 'Estos datos no distinguen tipos de viajero' }
+    return { title: `Parte de quien llega · ${k.label.toLowerCase()} · ${day}`, ramp: RAMP_VISITORS, min: pctTxt(s.visitorRange[0]), max: pctTxt(s.visitorRange[1]), note: 'Altura: llegadas por km²' }
   }
-  if (s.colorMode === 'bubble') {
-    return { title: `Burbuja · ${day}`, ramp: m.ramp, min: 'Abierta', max: 'Cerrada', note: s.dataset?.hasStays === false ? 'Sin datos: el fichero no incluye viajes dentro del mismo barrio' : height }
+  if (s.colorMode === 'influence' && s.sel >= 0) {
+    return { title: `Adónde va la gente de ${BARRIOS[s.sel].short}`, ramp: RAMP_INFLUENCE, min: 'Poca', max: 'Mucha', note: 'Parte de sus viajes de ese día' }
   }
-  if (s.colorMode === 'influence') {
-    if (s.sel < 0) return { title: 'Influencia', ramp: m.ramp, min: '', max: '', note: 'Haz clic en un barrio del mapa para elegirlo' }
-    return { title: s.influenceDir === 'in' ? `De dónde viene quien llega a ${BARRIOS[s.sel].short}` : `Adónde va la gente de ${BARRIOS[s.sel].short}`, ramp: m.ramp, min: 'Poca', max: 'Mucha', note: 'Parte de sus viajes de ese día' }
-  }
-  return { title: `Llegadas por km² · ${day}`, ramp: m.ramp, min: 'Tranquilo', max: 'Muy activo', note: 'Altura y color' }
+  return { title: `Llegadas por km² · ${day}`, ramp: RAMP_ACTIVITY, min: 'Tranquilo', max: 'Muy activo', note: 'Altura y color' }
 }
