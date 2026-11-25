@@ -152,3 +152,28 @@ export function along(path, u) {
   }
   return path[path.length - 1]
 }
+
+// Routes a set of flows {i, j, v} over the neighbourhood network and returns the load each
+// segment would carry (used by the simulator to show which corridors fill up or empty).
+let NET = null
+function net() {
+  if (!NET) { const adj = neighbourGraph(); NET = { adj, trees: Array.from({ length: N }, (_, i) => shortestTree(adj, i)) } }
+  return NET
+}
+export function routeFlows(flows) {
+  const { trees } = net()
+  const load = new Map()
+  for (const f of flows) {
+    const p = pathFrom(trees[f.i], f.i, f.j)
+    if (!p) continue
+    for (let k = 1; k < p.length; k++) {
+      const key = ek(p[k - 1], p[k])
+      const e = load.get(key) || { a: Math.min(p[k - 1], p[k]), b: Math.max(p[k - 1], p[k]), load: 0, net: 0 }
+      e.load += Math.abs(f.v)
+      e.net += f.v
+      load.set(key, e)
+    }
+  }
+  return [...load.values()].map((e) => ({ ...e, sign: Math.sign(e.net) || 1 })).sort((x, y) => y.load - x.load)
+}
+export const edgeKey = ek

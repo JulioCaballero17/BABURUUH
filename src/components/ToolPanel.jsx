@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, UtensilsCrossed, ShoppingBag, Briefcase, Store, Ticket, Construction, Laptop, MousePointerClick, TrainFront, ArrowRight } from 'lucide-react'
+import { X, UtensilsCrossed, ShoppingBag, Briefcase, Store, Ticket, Construction, Laptop, MousePointerClick, TrainFront, ArrowRight, RotateCcw, Play, Pause } from 'lucide-react'
 import { useStore } from '../store.js'
 import { BARRIOS } from '../model/geo.js'
 import { BUSINESSES, SCENARIOS, VISITOR_KINDS, visitorSeason } from '../model/tools.js'
-import { getScores, getSim, getVisitors } from '../engine/toolState.js'
-import { selectBarrio, setView, flyTo } from '../engine/mapEngine.js'
+import { getScores, getSim, getVisitors, catchment } from '../engine/toolState.js'
+import { selectBarrio, setView, flyTo, replaySim } from '../engine/mapEngine.js'
 import { DAYS } from '../lib/colors.js'
 import { fmt, fmtK, pct } from '../lib/format.js'
 import { dayOf } from '../lib/week.js'
-import { panelMotion, stagger } from './ui/primitives.jsx'
+import { panelMotion, stagger, Segmented } from './ui/primitives.jsx'
 
 const BIZ_ICON = { ocio: UtensilsCrossed, turista: ShoppingBag, trabajo: Briefcase, barrio: Store }
 const SC_ICON = { evento: Ticket, cierre: Construction, teletrabajo: Laptop }
@@ -29,6 +29,7 @@ function AbrirPanel() {
   const setBusiness = useStore((s) => s.setBusiness)
   const ds = useStore((s) => s.dataset)
   const res = useMemo(() => getScores(useStore.getState()), [business, ds]) // eslint-disable-line react-hooks/exhaustive-deps
+  const sel = useStore((s) => s.sel)
   return (
     <>
       <section>
@@ -56,7 +57,32 @@ function AbrirPanel() {
         </ol>
         <p className="note" style={{ marginTop: 10 }}>{res.business.desc} Se calcula con cuánta gente llega, quién es y qué día viene, según los datos de movilidad.</p>
       </section>
+      <Customers focus={sel >= 0 ? sel : res.top[0]?.i} />
     </>
+  )
+}
+
+// Where the customers of a barrio would come from (the yellow comets on the map).
+function Customers({ focus }) {
+  const ds = useStore((s) => s.dataset)
+  const day = useStore((s) => dayOf(s.t))
+  const list = useMemo(() => (focus == null ? [] : catchment(useStore.getState(), focus).slice(0, 5)), [focus, ds, day]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (focus == null) return null
+  const max = list[0]?.v || 1
+  return (
+    <section data-tour="customers">
+      <div className="section-title"><h3>De dónde vendrían tus clientes</h3><span>{DAYS[day].name}</span></div>
+      <p className="note" style={{ marginBottom: 10 }}>A <b style={{ color: 'var(--ink)' }}>{BARRIOS[focus].short}</b> llega gente sobre todo de estos barrios. En el mapa, las líneas amarillas.</p>
+      <div className="bars">
+        {list.map((o) => (
+          <div key={o.j} className="bar-row" onClick={() => selectBarrio(o.j)}>
+            <span className="n">{BARRIOS[o.j].name}</span>
+            <span className="v">{fmtK(o.v)} al día</span>
+            <span className="track"><motion.i initial={{ scaleX: 0 }} animate={{ scaleX: o.v / max }} style={{ width: '100%', background: 'var(--accent)' }} /></span>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -71,11 +97,27 @@ function SimPanel() {
   const ds = useStore((s) => s.dataset)
   const day = useStore((s) => dayOf(s.t))
   const sc = SCENARIOS.find((x) => x.key === scenario)
-  const r = useMemo(() => getSim(useStore.getState()), [scenario, simPlace, simAmount, ds, day]) // eslint-disable-line react-hooks/exhaustive-deps
+  const nLines = useStore((s) => s.metroLines.length)
+  const r = useMemo(() => getSim(useStore.getState()), [scenario, simPlace, simAmount, ds, day, nLines]) // eslint-disable-line react-hooks/exhaustive-deps
   const [live, setLive] = useState(r.amount)
   useEffect(() => setLive(r.amount), [r.amount, scenario])
   const dn = DAYS[day].name.toLowerCase()
   const place = r.place
+  const simShow = useStore((s) => s.simShow)
+  const setSimShow = useStore((s) => s.setSimShow)
+  let impactList = []
+  if (scenario === 'evento') {
+    const mx = Math.abs(r.flows[0]?.v) || 1
+    impactList = r.flows.slice(0, 5).map((f) => ({ i: f.i, k: Math.abs(f.v) / mx, label: `${fmtK(f.v)} personas` }))
+  } else if (scenario === 'cierre') {
+    const mx = Math.abs(r.flows[0]?.v) || 1
+    impactList = r.flows.slice(0, 5).map((f) => ({ i: f.j, k: Math.abs(f.v) / mx, label: `+${pct(r.change[f.j])}` }))
+  } else {
+    const ls = [...r.change.keys()].filter((i) => r.base[i] > 300).sort((a, b) => r.change[a] - r.change[b]).slice(0, 5)
+    const mx = Math.abs(r.change[ls[0]]) || 1
+    impactList = ls.map((i) => ({ i, k: Math.abs(r.change[i]) / mx, label: `−${pct(-r.change[i])}`, neg: true }))
+  }
+  const lines = (r.lineImpact || []).filter((l) => Math.abs(l.change) >= 0.01).slice(0, 3)
 
   useEffect(() => {
     if (place >= 0) flyTo({ center: BARRIOS[place].c, zoom: 12.6, pitch: 58, bearing: -30 }, 1600)
@@ -102,7 +144,7 @@ function SimPanel() {
     headline = (
       <>
         <p className="result-big"><b>−{fmtK(-r.totalDelta)}</b> viajes un {dn}</p>
-        <p className="result-sub">Los barrios que más se vacían son los de oficinas: <b>{r.losers.map((i) => BARRIOS[i].short).join(', ')}</b>.</p>
+        <p className="result-sub">Se pierde el {r.amount} % de los viajes de residentes hacia los barrios que reciben mucha más gente de la que vive (zonas de trabajo y estudio). Los que más se vacían: <b>{r.losers.map((i) => BARRIOS[i].short).join(', ')}</b>.</p>
       </>
     )
   }
@@ -119,6 +161,10 @@ function SimPanel() {
         <motion.div key={`${scenario}-${place}-${r.amount}-${day}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           {headline}
         </motion.div>
+        <div className="sim-compare">
+          <Segmented id="sim-show" label="Comparar" value={simShow} onChange={setSimShow} options={[{ value: 'before', label: 'Un día normal' }, { value: 'after', label: 'Con el escenario' }]} />
+          <button className="btn sm ghost" onClick={replaySim} title="Volver a ver la transición"><RotateCcw /> Repetir</button>
+        </div>
       </section>
       <section className="sim-ctl" data-tour="sim-ctl">
         {sc.place && (
@@ -139,6 +185,35 @@ function SimPanel() {
             style={{ '--p': `${((live - sc.amount.min) / (sc.amount.max - sc.amount.min)) * 100}%` }} />
         </div>
       </section>
+      {impactList.length > 0 && (
+        <section data-tour="sim-impact">
+          <div className="section-title"><h3>{scenario === 'evento' ? 'De dónde sale la gente' : scenario === 'cierre' ? 'Adónde se desvía' : 'Barrios que más se vacían'}</h3></div>
+          <div className="bars">
+            {impactList.map((o) => (
+              <div key={o.i} className="bar-row" onClick={() => selectBarrio(o.i)}>
+                <span className="n">{BARRIOS[o.i].name}</span>
+                <span className="v">{o.label}</span>
+                <span className="track"><motion.i initial={{ scaleX: 0 }} animate={{ scaleX: o.k }} style={{ width: '100%', background: o.neg ? '#1F4FBF' : 'var(--accent)' }} /></span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {lines.length > 0 && (
+        <section data-tour="sim-lines">
+          <div className="section-title"><h3>Cómo afecta al metro de la demanda</h3></div>
+          <ul className="impact-lines">
+            {lines.map((l) => (
+              <li key={l.id}>
+                <span className="roundel" style={{ background: l.color, color: l.name === 'L4' ? '#17191C' : '#fff' }}>{l.name}</span>
+                <span className="il-txt">{BARRIOS[l.from].short} ↔ {BARRIOS[l.to].short}</span>
+                <span className={`il-v ${l.change < 0 ? 'neg' : ''}`}>{l.change >= 0 ? '+' : '−'}{Math.abs(Math.round(l.change * 100))} %</span>
+              </li>
+            ))}
+          </ul>
+          <p className="note" style={{ marginTop: 8 }}>Carga extra en cada línea del plano Metro, repartiendo los viajes del escenario por las rutas entre barrios vecinos. En el mapa brillan las rutas que más se cargan.</p>
+        </section>
+      )}
       <p className="note">Simulación para un {dn} medio, a partir de los patrones reales de movilidad. Es una estimación, no una predicción.</p>
     </>
   )
@@ -159,6 +234,7 @@ function Season({ summary, kind, period }) {
   return (
     <div className="season">
       <p className="season-read"><b>{months[k].label}</b> · {fmtK(vals[k])} visitantes al día{k === peak ? ' · el pico' : ''}</p>
+      <p className="note" style={{ margin: '-4px 0 8px' }}>Toca un mes para verlo en el mapa, o reprodúcelos todos.</p>
       <svg viewBox={`0 0 ${W} ${H + 16}`} width="100%" role="img" aria-label={`Visitantes por mes. Pico en ${months[peak].label}.`} onPointerLeave={() => setHv(-1)}>
         {months.map((p, i) => {
           const h = Math.max(2, (vals[i] / max) * H)
@@ -175,6 +251,29 @@ function Season({ summary, kind, period }) {
       </svg>
     </div>
   )
+}
+
+// Plays the months one after another so the map shows how tourism rises and falls through the year.
+function SeasonPlay() {
+  const periods = useStore((s) => s.periods)
+  const [on, setOn] = useState(false)
+  const timer = useRef(0)
+  const months = periods.filter((p) => p.kind === 'month')
+  useEffect(() => () => clearInterval(timer.current), [])
+  const toggle = () => {
+    if (on) { clearInterval(timer.current); setOn(false); return }
+    const cur = months.findIndex((p) => p.id === useStore.getState().period)
+    let k = cur >= 0 && cur < months.length - 1 ? cur + 1 : 0
+    setOn(true)
+    useStore.getState().setPeriod(months[k].id)
+    timer.current = setInterval(() => {
+      k++
+      if (k >= months.length || useStore.getState().view !== 'turismo') { clearInterval(timer.current); setOn(false); return }
+      useStore.getState().setPeriod(months[k].id)
+    }, 1500)
+  }
+  if (!months.length) return null
+  return <button className="btn sm" data-tour="season-play" onClick={toggle} aria-pressed={on}>{on ? <><Pause /> Pausar</> : <><Play /> Reproducir</>}</button>
 }
 
 function TurismoPanel() {
@@ -207,7 +306,7 @@ function TurismoPanel() {
         </div>
       </section>
       <section data-tour="season">
-        <div className="section-title"><h3>La temporada</h3><span>toca un mes para verlo</span></div>
+        <div className="section-title"><h3>La temporada</h3><SeasonPlay /></div>
         {summary ? <Season summary={summary} kind={kind} period={period} /> : <p className="note">Cargando la temporada…</p>}
       </section>
       <section className="two-lists">

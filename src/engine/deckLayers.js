@@ -12,8 +12,33 @@ const CHAMPAGNE = hexToRgb('#F1E3C2')
 let seed = 9157
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
 
-// Animated "comets" between barrios: the strongest flows of every day of the week.
-// Each day owns a 60-unit slot of animation time; the layer loops inside the current day's slot.
+const MAX_H = 950
+const WARM = [255, 214, 120]
+const colTop = (ds, t, i) => Math.pow(Math.max(0, Math.min(1, ds.DENS[t][i] / ds.densRef)), 0.85) * MAX_H
+
+// One comet travelling from the TOP of the origin column to the TOP of the destination column,
+// over an arc that clears both, so flows are never hidden behind the barrios.
+function comet(i, j, z0, z1, start, color, w, lift = 1) {
+  const dk = DM[i * N + j]
+  const dur = 8 + dk * 3
+  const side = (rnd() < 0.5 ? -1 : 1) * (0.12 + 0.18 * rnd())
+  const p = BARRIOS[i].c
+  const q = BARRIOS[j].c
+  const cx = (p[0] + q[0]) / 2 - (q[1] - p[1]) * side
+  const cy = (p[1] + q[1]) / 2 + (q[0] - p[0]) * side
+  const apex = (140 + dk * 120) * lift
+  const path = []
+  const ts = []
+  for (let k = 0; k <= 16; k++) {
+    const u = k / 16
+    const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u
+    path.push([a * p[0] + b * cx + c * q[0], a * p[1] + b * cy + c * q[1], z0 * (1 - u) + z1 * u + Math.sin(Math.PI * u) * apex + 15])
+    ts.push(start + dur * u)
+  }
+  return { path, ts, color, w }
+}
+
+// The strongest flows of every day of the week. Each day owns a 60-unit slot of animation time.
 export function buildTrips(ds, elev) {
   seed = 9157
   const trips = []
@@ -23,59 +48,63 @@ export function buildTrips(ds, elev) {
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (i !== j && Ft[i * N + j] > 0) list.push([Ft[i * N + j], i, j])
     if (!list.length) continue
     list.sort((a, b) => b[0] - a[0])
-    const top = list.slice(0, 60)
+    const top = list.slice(0, 70)
     const vmax = top[0][0]
-    const color = DAY_RGB[t]
     for (const [v, i, j] of top) {
-      const n = 1 + Math.round((2.6 * v) / vmax)
+      const n = 1 + Math.round((3 * v) / vmax)
       for (let m = 0; m < n; m++) {
-        const start = t * 60 + rnd() * 52
-        const dk = DM[i * N + j]
-        const dur = 9 + dk * 3.4
-        const side = (rnd() < 0.5 ? -1 : 1) * (0.18 + 0.22 * rnd())
-        const p = BARRIOS[i].c
-        const q = BARRIOS[j].c
-        const mx = (p[0] + q[0]) / 2
-        const my = (p[1] + q[1]) / 2
-        const cx = mx - (q[1] - p[1]) * side
-        const cy = my + (q[0] - p[0]) * side
-        const path = []
-        const ts = []
-        for (let s = 0; s <= 12; s++) {
-          const u = s / 12
-          const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u
-          const z = (elev[i] || 0) * (1 - u) + (elev[j] || 0) * u + Math.sin(Math.PI * u) * (40 + dk * 95) + 12
-          path.push([a * p[0] + b * cx + c * q[0], a * p[1] + b * cy + c * q[1], z])
-          ts.push(start + dur * u)
-        }
-        trips.push({ path, ts, color, w: 1.2 + (2.4 * v) / vmax })
+        trips.push(comet(i, j, (elev[i] || 0) + colTop(ds, t, i), (elev[j] || 0) + colTop(ds, t, j), t * 60 + rnd() * 50, WARM, 1.6 + (2.6 * v) / vmax))
       }
     }
   }
   return trips
 }
 
-export function buildDeckLayers({ s, trips, elev, now, zoom, grow, metro, metroT = 0, sim }) {
+// Comets for a list of flows {i, j, v} (simulator, tourism, customers). Loops over a 40-unit period.
+// The comets are a proportional sample of ALL the flows: a flow with 2 % of the trips gets ~2 % of the
+// comets, so the picture on the map always matches the data (no "top N" cut that hides most of it).
+export function buildFlowComets(flows, heights, elev, { count = 500, color = WARM, colorNeg = [111, 143, 214], lift = 1.2 } = {}) {
+  seed = 777
+  const tot = flows.reduce((a, f) => a + Math.abs(f.v), 0) || 1
+  const vmax = Math.max(...flows.map((f) => Math.abs(f.v))) || 1
+  const out = []
+  for (const f of flows) {
+    const exp = (count * Math.abs(f.v)) / tot
+    const n = Math.floor(exp) + (rnd() < exp - Math.floor(exp) ? 1 : 0)
+    for (let m = 0; m < n; m++) {
+      const c = comet(f.i, f.j, (elev[f.i] || 0) + (heights?.[f.i] || 0), (elev[f.j] || 0) + (heights?.[f.j] || 0), rnd() * 40, f.v >= 0 ? color : colorNeg, 1.8 + 3 * Math.sqrt(Math.abs(f.v) / vmax), lift)
+      out.push(c)
+      if (c.ts[c.ts.length - 1] > 40) out.push({ ...c, ts: c.ts.map((x) => x - 40) })
+    }
+  }
+  return out
+}
+
+const GLOW = { depthCompare: 'always', blend: true, blendColorOperation: 'add', blendColorSrcFactor: 'src-alpha', blendColorDstFactor: 'one', blendAlphaOperation: 'add', blendAlphaSrcFactor: 'one', blendAlphaDstFactor: 'one' }
+
+// Two passes: a wide soft glow and a bright core. Drawn on top of the columns, never hidden by them.
+export function cometLayers(id, data, currentTime, opacity = 1, trail = 14) {
+  if (!data?.length) return []
+  return [
+    new TripsLayer({ id: `${id}-glow`, data, getPath: (d) => d.path, getTimestamps: (d) => d.ts, getColor: (d) => d.color, getWidth: (d) => d.w * 3.2, widthUnits: 'pixels', capRounded: true, jointRounded: true, fadeTrail: true, trailLength: trail, currentTime, opacity: 0.22 * opacity, parameters: GLOW }),
+    new TripsLayer({ id: `${id}-core`, data, getPath: (d) => d.path, getTimestamps: (d) => d.ts, getColor: (d) => d.color, getWidth: (d) => d.w, widthUnits: 'pixels', widthMinPixels: 1.4, capRounded: true, jointRounded: true, fadeTrail: true, trailLength: trail, currentTime, opacity: 0.95 * opacity, parameters: { depthCompare: 'always' } }),
+  ]
+}
+
+export function buildDeckLayers({ s, trips, elev, now, zoom, grow, metro, metroT = 0, sim, extraComets, corridors }) {
   const out = []
   if (s.intro !== 'done') return out
   const { t, layers, dataset: ds, sel, colorMode, influenceDir } = s
   const day = stepOf(t)
   const tod = (now / 1000) % 1000
 
-  if (sim && sim.flows.length) {
-    const vmax = Math.abs(sim.flows[0].v) || 1
-    out.push(new ArcLayer({
-      id: 'sim-arcs',
-      data: sim.flows,
-      getSourcePosition: (o) => [...BARRIOS[o.i].c, elev[o.i] || 0],
-      getTargetPosition: (o) => [...BARRIOS[o.j].c, elev[o.j] || 0],
-      getSourceColor: (o) => (o.v > 0 ? [255, 199, 44, 90] : [124, 158, 228, 90]),
-      getTargetColor: (o) => (o.v > 0 ? [255, 199, 44, 245] : [31, 79, 191, 245]),
-      getWidth: (o) => 1.5 + 9 * Math.sqrt(Math.abs(o.v) / vmax),
-      getHeight: 0.45,
-      widthUnits: 'pixels',
-      updateTriggers: { getWidth: sim, getSourcePosition: sim, getTargetPosition: sim, getSourceColor: sim, getTargetColor: sim },
-    }))
+  // corridors that carry the extra (or missing) trips in the simulator: glowing routes between barrios
+  if (corridors?.length) {
+    const vmax = corridors[0].load || 1
+    const data = corridors.map((c) => ({ ...c, path: [BARRIOS[c.a].c, BARRIOS[c.b].c] }))
+    const col = (c) => (c.sign >= 0 ? [255, 199, 44] : [111, 143, 214])
+    out.push(new PathLayer({ id: 'corr-glow', data, getPath: (d) => d.path, getColor: (d) => [...col(d), 70], getWidth: (d) => 8 + 26 * (d.load / vmax), widthUnits: 'pixels', capRounded: true, parameters: { depthCompare: 'always' }, updateTriggers: { getColor: corridors, getWidth: corridors } }))
+    out.push(new PathLayer({ id: 'corr-core', data, getPath: (d) => d.path, getColor: (d) => [...col(d), 235], getWidth: (d) => 2.5 + 7 * (d.load / vmax), widthUnits: 'pixels', capRounded: true, parameters: { depthCompare: 'always' }, updateTriggers: { getColor: corridors, getWidth: corridors } }))
   }
   if (metroT > 0.01 && metro) {
     out.push(...metroLayers({ s, metro, metroT, now, zoom, day }))
@@ -83,24 +112,9 @@ export function buildDeckLayers({ s, trips, elev, now, zoom, grow, metro, metroT
   if (metroT > 0.5) return out
 
   if (layers.flows && trips && s.view === 'mapa') {
-    const currentTime = day * 60 + ((tod * 9) % 60)
-    out.push(new TripsLayer({
-      id: 'trips',
-      data: trips,
-      getPath: (d) => d.path,
-      getTimestamps: (d) => d.ts,
-      getColor: (d) => d.color,
-      getWidth: (d) => d.w,
-      widthUnits: 'pixels',
-      widthMinPixels: 1.4,
-      jointRounded: true,
-      capRounded: true,
-      fadeTrail: true,
-      trailLength: 24,
-      currentTime,
-      opacity: sel >= 0 ? 0.28 : 0.9,
-    }))
+    out.push(...cometLayers('trips', trips, day * 60 + ((tod * 9) % 60), sel >= 0 ? 0.3 : 1, 22))
   }
+  if (extraComets?.length) out.push(...cometLayers('tool-comets', extraComets, (tod * 7) % 40, 1, 12))
 
   if (sel >= 0 && layers.arcs) {
     const list = (colorMode === 'influence' && influenceDir === 'in' ? topTo(ds, sel, t, 10) : topFrom(ds, sel, t, 10)).filter((o) => o.v > 0)

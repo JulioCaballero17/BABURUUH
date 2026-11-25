@@ -560,3 +560,9 @@ input, select { font: inherit; color: inherit; }
 :root[data-theme='dark'] .view-thumb { background: var(--accent); }
 :root[data-theme='dark'] .views button[aria-pressed='true'] { color: var(--on-accent); }
 :root[data-theme='dark'] .views button[aria-pressed='true'] svg { color: var(--on-accent); }
+.sim-compare { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.impact-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.impact-lines li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; background: var(--paper-2); font-size: 12.5px; }
+.impact-lines .il-txt { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.impact-lines .il-v { font-family: var(--font-display); font-stretch: 108%; font-weight: 800; font-size: 15px; color: var(--accent-text); }
+.impact-lines .il-v.neg { color: #3E6BD6; }

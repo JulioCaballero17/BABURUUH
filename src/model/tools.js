@@ -170,9 +170,10 @@ export function simulate(ds, key, { place, amount, day }) {
   const change = Float32Array.from(sim, (v, i) => (base[i] ? v / base[i] - 1 : 0))
   const byChange = [...change.keys()].filter((i) => base[i] > 300).sort((a, b) => change[b] - change[a])
   flows.sort((a, b) => Math.abs(b.v) - Math.abs(a.v))
+  const allFlows = flows.slice()
   const totalBase = base.reduce((a, b) => a + b, 0)
   const totalSim = sim.reduce((a, b) => a + b, 0)
-  return { base, sim, change, gainers: byChange.slice(0, 3), losers: byChange.slice(-3).reverse(), flows: flows.slice(0, 14), totalDelta: totalSim - totalBase }
+  return { base, sim, change, gainers: byChange.filter((i) => change[i] > 0.005).slice(0, 3), losers: byChange.filter((i) => change[i] < -0.005).slice(-3).reverse(), flows: flows.slice(0, 40), allFlows, totalDelta: totalSim - totalBase }
 }
 
 /* ------------------------------------------------------------------ Turismo */

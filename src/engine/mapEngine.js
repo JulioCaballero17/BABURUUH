@@ -5,13 +5,13 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useStore, selectDark } from '../store.js'
 import { buildStyle, rampExpr, PLANO, PLANO_LAYERS, LABEL_LAYERS } from './mapStyle.js'
-import { buildDeckLayers, buildTrips } from './deckLayers.js'
+import { buildDeckLayers, buildTrips, buildFlowComets } from './deckLayers.js'
 import { BARRIOS, N, HEXES } from '../model/geo.js'
 import { STEPS } from '../model/simulate.js'
 import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, RAMP_SCORE, hexToRgb, mix, rgbStr } from '../lib/colors.js'
 import { visitorShares, shareRange, periodRatio } from '../model/derive.js'
 import { buildMetro } from './metro.js'
-import { getScores, getSim, getVisitors, simPlaceOf } from './toolState.js'
+import { getScores, getSim, getVisitors, simPlaceOf, catchment } from './toolState.js'
 import { SCENARIOS } from '../model/tools.js'
 import { sunAt, dayOf } from '../lib/week.js'
 import { clamp, smoothstep } from '../lib/format.js'
@@ -56,6 +56,11 @@ const E = {
   flying: false,
   hovered: -1,
   metro: null,
+  heights: new Float32Array(N),
+  simT: 1,
+  simKey: '',
+  comets: null,
+  cometKey: '',
   metroKey: '',
   metroT: 0,
   dimLast: -1,
@@ -366,7 +371,9 @@ function updateBarrios(s, t, grow) {
       v = score.score[i]
       dim = ds.pop[i] < 1
     } else if (mode === 'sim') {
-      v = (clamp(Math.log2((sim.sim[i] + 50) / (sim.base[i] + 50)) / 1.2, -1, 1) + 1) / 2
+      const k = smoothstep(E.simT)
+      const now = sim.base[i] + (sim.sim[i] - sim.base[i]) * k
+      v = (clamp(Math.log2((now + 50) / (sim.base[i] + 50)) / 1.2, -1, 1) + 1) / 2
     } else if (mode === 'bubble') {
       v = bMax > bMin ? (ds.metrics[i].bub[day] - bMin) / (bMax - bMin) : 0
     } else if (shares) {
@@ -378,7 +385,11 @@ function updateBarrios(s, t, grow) {
     let h = Math.pow(base, 0.85) * MAX_H * grow + 6
     // in the tools, the height tells the answer: best places stand tall, simulated arrivals rise or sink
     if (score) h = Math.pow(score.score[i], 2.2) * MAX_H * 1.1 * grow + 6
-    if (sim) h = Math.pow(clamp(sim.sim[i] / BARRIOS[i].area / ds.densRef), 0.85) * MAX_H * grow + 6
+    if (sim) {
+      const now = sim.base[i] + (sim.sim[i] - sim.base[i]) * smoothstep(E.simT)
+      h = Math.pow(clamp(now / BARRIOS[i].area / ds.densRef), 0.85) * MAX_H * grow + 6
+    }
+    E.heights[i] = dim ? 6 : h
     map.setFeatureState({ source: 'barrios', id: i }, { v, h: dim ? 6 : h, sel: i === sel || i === simPlace, hov: i === hov, dim })
   }
 }
@@ -462,7 +473,7 @@ function frame(now) {
   applyLighting(sun, s)
 
   const grow = s.intro === 'done' ? (reduceMotion ? 1 : smoothstep((now - E.growStart - 300) / 2600)) : 0
-  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}|${s.comparePeriod}|${!!s.summary}|${s.visitorKind}|${s.view}|${s.business}|${s.scenario}|${s.simPlace}|${s.simAmount}`
+  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}|${s.comparePeriod}|${!!s.summary}|${s.visitorKind}|${s.view}|${s.business}|${s.scenario}|${s.simPlace}|${s.simAmount}|${E.simT.toFixed(3)}`
   if (key !== E.stateKey) { E.stateKey = key; updateBarrios(s, t, grow) }
   if (s.layers.hex) {
     const hk = `${t.toFixed(3)}|${s.dataset.version}|${grow.toFixed(3)}|${s.colorMode}|${s.deltaBase}`
@@ -485,6 +496,31 @@ function frame(now) {
     E.metro = buildMetro(s.metroVariant === 'visit' && s.dataset.segF ? visitorFlows(s.dataset) : s.dataset)
     useStore.setState({ metroLines: E.metro.lines.map((l) => ({ id: l.id, name: l.name, color: l.color, stations: l.stations, load: l.load })) })
   }
+  // simulator: every change replays the transition from today's flows to the simulated ones
+  const sim = s.view === 'simular' ? getSim(s) : null
+  if (sim && sim.key !== E.simKey) { E.simKey = sim.key; E.simT = 0 }
+  if (sim) {
+    const target = s.simShow === 'before' ? 0 : 1
+    if (E.simT !== target) E.simT = target > E.simT ? Math.min(1, E.simT + rdt / 1.8) : Math.max(0, E.simT - rdt / 0.9)
+  }
+  // comets of each tool: simulated trips, visitors' trips, or the customers of the best barrio
+  let ck = ''
+  if (s.view === 'simular' && sim) ck = `sim|${sim.key}`
+  else if (s.view === 'turismo') ck = `vis|${s.dataset.version}|${s.visitorKind}|${Math.round(t) % STEPS}`
+  else if (s.view === 'abrir') ck = `abr|${s.dataset.version}|${s.business}|${s.sel}|${Math.round(t) % STEPS}`
+  if (ck !== E.cometKey) {
+    E.cometKey = ck
+    E.comets = null
+    if (ck.startsWith('sim')) E.comets = buildFlowComets(sim.allFlows, Float32Array.from(E.heights), E.elev, { count: 900 })
+    else if (ck.startsWith('vis')) E.comets = buildFlowComets(visitorTopFlows(s), Float32Array.from(E.heights), E.elev, { count: 800, color: [255, 120, 180] })
+    else if (ck.startsWith('abr')) {
+      const focus = s.sel >= 0 ? s.sel : getScores(s).top[0]?.i
+      if (focus != null) E.comets = buildFlowComets(catchment(s, focus, 72).map((o) => ({ i: o.j, j: focus, v: o.v })), Float32Array.from(E.heights), E.elev, { count: 500 })
+    }
+  }
+  // comets start and end on top of the columns: refresh their heights as the columns change
+  const showComets = E.comets && (s.view !== 'simular' || E.simT > 0.35)
+
   const dim = smoothstep(E.metroT) * 0.9
   if (Math.abs(dim - E.dimLast) > 0.004 || (dim === 0 && E.dimLast !== 0)) {
     E.dimLast = dim
@@ -499,7 +535,7 @@ function frame(now) {
 
   const zoom = map.getZoom()
   if (Math.abs(zoom - s.zoom) > 0.05) useStore.setState({ zoom })
-  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow, metro: E.metro, metroT: E.metroT, sim: s.view === 'simular' ? getSim(s) : null }) })
+  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow, metro: E.metro, metroT: E.metroT, extraComets: showComets ? E.comets : null, corridors: sim && E.simT > 0.5 ? sim.corridors : null }) })
 
   // adaptive quality: on slow GPUs, drop the glass blur (the most expensive effect over a live map)
   if (s.intro === 'done' && !E.qualityDone) {
@@ -594,3 +630,23 @@ function visitorFlows(ds) {
   })
   return { ...ds, F }
 }
+
+// Strongest flows of visitors of the chosen kind, for the tourism comets.
+function visitorTopFlows(s) {
+  const ds = s.dataset
+  if (!ds.segF) return []
+  const names = { all: ['Regional', 'Nacional', 'Internacional'], intl: ['Internacional'], nac: ['Nacional'], reg: ['Regional'] }[s.visitorKind] || ['Internacional']
+  const d = Math.round(s.t) % STEPS
+  const list = []
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue
+      let v = 0
+      for (const n of names) v += ds.segF[n]?.[d]?.[i * N + j] || 0
+      if (v > 0) list.push({ i, j, v })
+    }
+  }
+  return list
+}
+
+export function replaySim() { E.simT = 0; E.simKey = useStore.getState().view === 'simular' ? E.simKey : ''; useStore.setState({ simShow: 'after' }) }

@@ -113,7 +113,7 @@ export function buildTour(ds, st) {
     {
       id: 'abrir',
       title: '¿Dónde abro mi negocio?',
-      body: `**Dónde abrir** puntúa cada barrio para un tipo de negocio con la gente que llega, quién es y qué día viene. Para restauración y ocio gana **${BARRIOS[ocio.top[0].i].name}**, seguido de ${names(ocio.top.slice(1).map((t) => t.i))}.`,
+      body: `**Dónde abrir** puntúa cada barrio para un tipo de negocio con la gente que llega, quién es y qué día viene. Para restauración y ocio gana **${BARRIOS[ocio.top[0].i].name}**, seguido de ${names(ocio.top.slice(1).map((t) => t.i))}. Las líneas amarillas muestran **de dónde vendrían tus clientes**.`,
       target: 'panel', badge: 'Dónde abrir', place: 'top-right',
       state: { t: 1, view: 'abrir', business: 'ocio' }, cam: { center: [2.165, 41.395], zoom: 12.3, pitch: 55, bearing: -22 },
     },
@@ -128,9 +128,9 @@ export function buildTour(ds, st) {
       id: 'simular',
       title: '¿Qué pasa si…?',
       body: event >= 0
-        ? `El **Simulador** prueba escenarios. Un partido con **60.000 personas** en ${BARRIOS[event].short} multiplica sus llegadas (+${pct(sEv.change[event])}), y los arcos muestran de dónde sale la gente: sobre todo de ${names(sEv.flows.slice(0, 3).map((f) => f.i))}.`
+        ? `El **Simulador** prueba escenarios. Un partido con **60.000 personas** en ${BARRIOS[event].short} multiplica sus llegadas (+${pct(sEv.change[event])}), y la gente viaja hacia allí sobre todo desde ${names(sEv.flows.slice(0, 3).map((f) => f.i))}, y **brillan las rutas que se saturarían**.`
         : 'El Simulador prueba escenarios: eventos, cierres o más teletrabajo.',
-      hint: 'Haz clic en el mapa para mover el evento a otro barrio.',
+      hint: 'Compara «Un día normal» con «Con el escenario». Haz clic en el mapa para mover el evento.',
       target: 'sim-result', badge: 'Simulador', place: 'top-right',
       state: { t: 2, view: 'simular', scenario: 'evento' }, cam: event >= 0 ? { center: BARRIOS[event].c, zoom: 12.4, pitch: 58, bearing: -30 } : HOME,
     },
@@ -148,7 +148,7 @@ export function buildTour(ds, st) {
       id: 'turismo',
       title: 'Adónde van los turistas',
       body: `**Turismo** colorea cada barrio por la parte de su gente que viene de fuera. Con el visitante extranjero destacan **${names(intlTop)}**.${peak ? ` El pico de la temporada fue **${peak.label.toLowerCase()}**.` : ''}`,
-      hint: 'Toca un mes de la temporada para ver ese mes en el mapa.',
+      hint: 'Pulsa «Reproducir» para ver la temporada mes a mes en el mapa.',
       target: 'season', badge: 'La temporada', place: 'top-right',
       state: { t: 2, view: 'turismo', visitorKind: 'intl' }, cam: { center: [2.172, 41.39], zoom: 12.7, pitch: 55, bearing: -20 }, hidden: !ds.segArr,
     },

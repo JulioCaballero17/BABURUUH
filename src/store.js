@@ -33,6 +33,7 @@ export const useStore = create((set, get) => ({
   scenario: 'evento', // Simulador
   simPlace: -1, // -1 = the scenario's default barrio
   simAmount: null, // null = the scenario's default amount
+  simShow: 'after', // before | after (compare today with the simulated day)
 
   // ---------- time (in days: 0 = Monday … 4 = Friday; fractional only while animating) ----------
   t: 0,
@@ -101,7 +102,8 @@ export const useStore = create((set, get) => ({
   setVisitorKind: (visitorKind) => set({ visitorKind }),
   setMetroFocus: (metroFocus) => set({ metroFocus }),
   setBusiness: (business) => set({ business }),
-  setScenario: (scenario) => set({ scenario, simPlace: -1, simAmount: null }),
+  setScenario: (scenario) => set({ scenario, simPlace: -1, simAmount: null, simShow: 'after' }),
+  setSimShow: (simShow) => set({ simShow }),
   setSimPlace: (simPlace) => set({ simPlace }),
   setSimAmount: (simAmount) => set({ simAmount }),
   loadSummary: async () => {
