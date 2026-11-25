@@ -23,7 +23,7 @@ export const rgbStr = (c, a = 1) => `rgba(${Math.round(c[0])},${Math.round(c[1])
 // Activity: night blue → harbour teal → taxi yellow. The busiest barrios burn yellow.
 export const RAMP_ACTIVITY = ['#1D2B45', '#24557A', '#2F8A9A', '#7FC2A5', '#E9DC7A', '#FFB81C']
 // Differences (day vs day, period vs period): blue = less, grey = same, amber = more. Colour-blind safe.
-export const RAMP_DELTA = ['#1F4FBF', '#7C9EE4', '#E6E7E4', '#F2C552', '#D98800']
+export const RAMP_DELTA = ['#1F4FBF', '#6F8FD6', '#9CA2A7', '#F2C552', '#D98800']
 // Bubble (self-containment): open = pale, closed = deep teal.
 export const RAMP_BUBBLE = ['#EEF0EC', '#C9E0D6', '#8CC6B6', '#4C9F93', '#256F6B', '#13434A']
 // Influence (share of one barrio's trips): asphalt → yellow.
@@ -43,6 +43,9 @@ export const rampAt = (ramp, v) => {
 // One colour per district (used in the chord diagram, the scatter and the ranking).
 // Muted, evenly spaced hues that sit next to the yellow accent without competing with it.
 export const DISTRICT_COLORS = ['#000000', '#5B8DEF', '#E4795B', '#4DB6A0', '#C77DD1', '#E8B04A', '#6FA8C9', '#D9607F', '#8BBF63', '#9C8CE0', '#B8946A']
+
+// Dónde abrir: worse → better place (asphalt → taxi yellow).
+export const RAMP_SCORE = ['#262B33', '#3B4657', '#677A85', '#B8B57C', '#FFC72C']
 
 // Traveller types, for composition bars.
 export const SEGMENT_COLORS = { Residente: '#4A5E8C', Regional: '#2F8A9A', Nacional: '#E8B04A', Internacional: '#D46A9F' }

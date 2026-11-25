@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route, Map as MapIcon, TrainFront, Sparkles, Clapperboard } from 'lucide-react'
+import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route, CalendarDays, TrainFront, Store, FlaskConical, Luggage } from 'lucide-react'
 import { setView } from '../engine/mapEngine.js'
 import { useStore, selectDark } from '../store.js'
 import { BrandMark } from './ui/primitives.jsx'
@@ -33,17 +33,20 @@ export async function copyLink() {
   }
 }
 
-const VIEWS = [
-  { key: 'mapa', label: 'Mapa', icon: MapIcon, title: 'Mapa de barrios' },
-  { key: 'metro', label: 'Metro', icon: TrainFront, title: 'Plano de metro de la demanda (M)' },
-  { key: 'flujo', label: 'En movimiento', icon: Sparkles, title: 'Barcelona en movimiento (E)' },
+// The five things Baburu does. Each one is a mode of the same map.
+export const VIEWS = [
+  { key: 'mapa', label: 'La semana', icon: CalendarDays, kb: 'S', title: 'Cómo se mueve la ciudad cada día laborable' },
+  { key: 'metro', label: 'Metro', icon: TrainFront, kb: 'M', title: 'El plano de metro que dibuja la demanda' },
+  { key: 'abrir', label: 'Dónde abrir', icon: Store, kb: 'A', title: 'El mejor barrio para cada tipo de negocio' },
+  { key: 'simular', label: 'Simulador', icon: FlaskConical, kb: 'X', title: '¿Qué pasa si…? Eventos, cierres y teletrabajo' },
+  { key: 'turismo', label: 'Turismo', icon: Luggage, kb: 'U', title: 'Dónde van los visitantes y cuándo' },
 ]
 function ViewSwitch() {
   const view = useStore((s) => s.view)
   return (
-    <nav className="views glass" aria-label="Vista" data-tour="views">
+    <nav className="views glass" aria-label="Qué quieres ver" data-tour="views">
       {VIEWS.map((v) => (
-        <button key={v.key} data-tour={`view-${v.key}`} aria-pressed={view === v.key} onClick={() => setView(v.key === view ? 'mapa' : v.key)} title={v.title}>
+        <button key={v.key} data-tour={`view-${v.key}`} aria-pressed={view === v.key} onClick={() => setView(v.key)} title={`${v.title} (${v.kb})`}>
           {view === v.key && <motion.span layoutId="view-thumb" className="view-thumb" transition={{ type: 'spring', stiffness: 480, damping: 38 }} />}
           <v.icon aria-hidden="true" /> <span className="lbl">{v.label}</span>
         </button>
@@ -77,9 +80,8 @@ export default function TopBar() {
           <Search /> <span className="lbl">Buscar un barrio o una acción</span> <span className="kbd">Ctrl K</span>
         </button>
         <button className="tour-btn" data-tour="tour-btn" onClick={() => setStory({ active: !tourOn, idx: 0 })} aria-pressed={tourOn} title="Recorrido por todas las funciones (T)">
-          <Route aria-hidden="true" /> {tourOn ? <>Salir<span className="hide-m"> del tour</span></> : 'Tour'}
+          <Route aria-hidden="true" /> {tourOn ? 'Salir' : 'Tour'}
         </button>
-        <button className="icon-btn hide-m" data-tour="cinema-btn" onClick={() => useStore.getState().setCinema({ active: true, idx: 0 })} aria-label="Vuelo cinematográfico" title="Vuelo cinematográfico (V)"><Clapperboard /></button>
         <span className="divider-v" />
         <button className="icon-btn hide-m" data-tour="capture" onClick={downloadCapture} aria-label="Descargar captura del mapa" title="Descargar captura (P)"><Camera /></button>
         <button className="icon-btn hide-m" data-tour="share" onClick={copyLink} aria-label="Copiar enlace a esta vista" title="Copiar enlace a esta vista"><Link2 /></button>

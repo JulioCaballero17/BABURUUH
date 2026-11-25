@@ -3,7 +3,6 @@ import { useStore } from './store.js'
 import { fetchWeather, fetchBicing } from './lib/apis.js'
 import { writeHash } from './lib/url.js'
 import { getCamera, flyHome, getMap } from './engine/mapEngine.js'
-import { PANELS } from './components/Rail.jsx'
 import { downloadCapture } from './components/TopBar.jsx'
 import { setView } from './engine/mapEngine.js'
 
@@ -21,7 +20,7 @@ export function useShortcuts() {
         else if (s.help) s.setHelp(false)
         else if (s.cmdk) s.setCmdk(false)
         else if (s.sel >= 0) s.select(-1)
-        else if (s.panel) s.setPanel(s.panel)
+        else if (s.view !== 'mapa') setView('mapa')
         return
       }
       if (s.cmdk || s.help) return
@@ -30,22 +29,16 @@ export function useShortcuts() {
       if (e.key === ' ' && !onButton) { e.preventDefault(); s.togglePlay(); return }
       if (/^[1-5]$/.test(e.key) && !s.story.active) { s.goDay(Number(e.key) - 1); return }
       if (e.key.toLowerCase() === 't') { s.setStory({ active: !s.story.active, idx: 0 }); return }
-      if (s.cinema.active) return
-      if (e.key.toLowerCase() === 'v' && !s.story.active) { s.setCinema({ active: true, idx: 0 }); return }
-      if (e.key.toLowerCase() === 'm' && !s.story.active) { setView('metro'); return }
-      if (e.key.toLowerCase() === 'e' && !s.story.active) { setView('flujo'); return }
+      const mk = { s: 'mapa', m: 'metro', a: 'abrir', x: 'simular', u: 'turismo' }[e.key.toLowerCase()]
+      if (mk && !s.story.active) { setView(mk); return }
       if (e.key === 'ArrowRight' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(1); return }
       if (e.key === 'ArrowLeft' && !onButton && !s.story.active) { e.preventDefault(); s.stepDay(-1); return }
       if (e.key === '/') { e.preventDefault(); s.setCmdk(true); return }
       if (e.key === '?') { s.setHelp(true); return }
       const k = e.key.toLowerCase()
-      const p = PANELS.find((x) => x.kb.toLowerCase() === k)
-      if (p && !s.story.active) { s.setPanel(p.key); return }
       if (k === 'o') s.setOrbit(!s.orbit)
       else if (k === 'h') flyHome()
       else if (k === 'p') downloadCapture()
-      else if (k === 'd') { if (s.colorMode === 'delta') s.setColorMode('activity'); else { s.setDeltaBase(0); s.setColorMode('delta') } }
-      else if (k === 'c' && s.sel >= 0) s.openCompare()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -97,7 +90,7 @@ export function useHashSync() {
     }
     const unsub = useStore.subscribe((s, p) => {
       if (s.intro !== 'done') return
-      if (Math.round(s.t) !== Math.round(p.t) || s.period !== p.period || s.segment !== p.segment || s.sel !== p.sel || s.colorMode !== p.colorMode || s.layers !== p.layers || s.deltaBase !== p.deltaBase || s.intro !== p.intro) push()
+      if (Math.round(s.t) !== Math.round(p.t) || s.period !== p.period || s.segment !== p.segment || s.sel !== p.sel || s.colorMode !== p.colorMode || s.layers !== p.layers || s.view !== p.view || s.business !== p.business || s.scenario !== p.scenario || s.visitorKind !== p.visitorKind || s.intro !== p.intro) push()
     })
     const attach = () => { const m = getMap(); if (m) m.on('moveend', push); else setTimeout(attach, 300) }
     attach()

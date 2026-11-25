@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, GitCompareArrows, LocateFixed, Waypoints } from 'lucide-react'
+import { X, LocateFixed } from 'lucide-react'
 import { useStore, selectDark } from '../store.js'
 import { BARRIOS } from '../model/geo.js'
 import { topFrom, topTo } from '../model/derive.js'
@@ -11,11 +11,8 @@ const WHO = { Residente: 'Residentes', Regional: 'Resto de Cataluña', Nacional:
 import Evolution from './charts/Evolution.jsx'
 import { fmt, fmtK, pct, signedPct } from '../lib/format.js'
 import { dayOf } from '../lib/week.js'
-import { dnaAxes } from '../lib/dna.js'
 import { selectBarrio, flyTo } from '../engine/mapEngine.js'
 import { AnimatedNumber, Segmented, stagger } from './ui/primitives.jsx'
-import WeekHeatmap from './charts/WeekHeatmap.jsx'
-import Radar from './charts/Radar.jsx'
 
 const drawerMotion = {
   initial: { opacity: 0, x: 40 },
@@ -26,11 +23,7 @@ const drawerMotion = {
 function Body({ i }) {
   const ds = useStore((s) => s.dataset)
   const day = useStore((s) => dayOf(s.t))
-  const goTo = useStore((s) => s.goTo)
-  const openCompare = useStore((s) => s.openCompare)
   const setHover = useStore((s) => s.setHover)
-  const colorMode = useStore((s) => s.colorMode)
-  const influenceDir = useStore((s) => s.influenceDir)
   const dark = useStore(selectDark)
   const summary = useStore((s) => s.summary)
   const segment = useStore((s) => s.segment)
@@ -41,8 +34,6 @@ function Body({ i }) {
   const b = BARRIOS[i]
   const m = ds.metrics[i]
 
-  const series = useMemo(() => ds.ARR.map((a) => a[i]), [ds, i])
-  const axes = useMemo(() => dnaAxes(ds, i), [ds, i])
   const arrNow = ds.ARR[day][i]
   const arrMon = ds.ARR[0][i]
   const list = dir === 'out' ? topFrom(ds, i, day, 5) : topTo(ds, i, day, 5)
@@ -54,13 +45,6 @@ function Body({ i }) {
   const hue = dark ? DAYS[day].hue : 'var(--ink)'
   const comp = ds.segArr ? Object.keys(ds.segArr).map((n) => ({ n, v: ds.segArr[n][day][i] })) : null
   const compTot = comp ? comp.reduce((a, c) => a + c.v, 0) : 0
-  const influenceOn = colorMode === 'influence'
-
-  const setInfluence = () => {
-    const s = useStore.getState()
-    if (influenceOn && s.influenceDir === dir) s.setColorMode('activity')
-    else { s.setInfluenceDir(dir); s.setColorMode('influence') }
-  }
 
   return (
     <>
@@ -77,8 +61,6 @@ function Body({ i }) {
           <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>{m.tag.text}</span>
         </div>
         <div className="drawer-tools">
-          <button className="btn sm" data-tour="drawer-compare" onClick={() => openCompare()}><GitCompareArrows /> Comparar</button>
-          <button className="btn sm" data-tour="drawer-influence" aria-pressed={influenceOn && influenceDir === dir} onClick={setInfluence}><Waypoints /> {influenceOn && influenceDir === dir ? 'Quitar influencia' : 'Ver influencia'}</button>
           <button className="btn sm ghost" onClick={() => flyTo({ center: b.c, zoom: 14.4, pitch: 66 }, 1800)}><LocateFixed /> Acercar</button>
         </div>
       </div>
@@ -132,12 +114,7 @@ function Body({ i }) {
           </section>
         )}
 
-        <section>
-          <div className="section-title"><h3>Llegadas, día a día</h3><span>toca un día</span></div>
-          <WeekHeatmap series={series} current={day} onPick={(d) => goTo(d, 900)} label={`Llegadas a ${b.name} cada día de lunes a viernes`} />
-        </section>
-
-        <section>
+        <section data-tour="drawer-flows">
           <div className="section-title">
             <h3>{dir === 'out' ? 'Adónde va su gente' : 'De dónde viene'}</h3>
             <span>{DAYS[day].name}</span>
@@ -159,42 +136,6 @@ function Body({ i }) {
           </div>
         </section>
 
-        {ds.hasStays && (
-          <section>
-            <div className="section-title"><h3>Burbuja por día</h3><span>viajes que no salen del barrio</span></div>
-            <div className="day-bars" style={{ height: 96 }}>
-              {m.bub.map((v, k) => {
-                const mx = Math.max(...m.bub, ...ds.cityBub) || 1
-                return (
-                  <div key={k} className={`db ${k === day ? 'on' : ''}`}>
-                    <span className="num" style={{ fontSize: 11 }}>{pct(v)}</span>
-                    <motion.span className="bar" initial={{ height: 0 }} animate={{ height: (v / mx) * 56 }} transition={{ type: 'spring', stiffness: 140, damping: 20, delay: k * 0.04 }} />
-                    <span className="lab">{DAYS[k].short}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
-        <section>
-          <div className="section-title"><h3>ADN del barrio</h3><span>discontinua: mediana de la ciudad</span></div>
-          <div style={{ display: 'grid', placeItems: 'center' }}><Radar axes={axes} color={hue} size={236} /></div>
-        </section>
-
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {[
-            [fmt(ds.pop[i] * 1000), 'habitantes'],
-            [ds.rest[i].toLocaleString('es-ES'), 'restaurantes por 1.000 hab.'],
-            [b.area.toLocaleString('es-ES', { maximumFractionDigits: 2 }), 'km²'],
-            [fmt((ds.pop[i] * 1000) / b.area), 'hab./km²'],
-          ].map(([v, l]) => (
-            <div key={l} className="kpi" style={{ padding: '8px 10px' }}>
-              <div className="num" style={{ fontSize: 14, fontWeight: 600 }}>{v}</div>
-              <div className="l">{l}</div>
-            </div>
-          ))}
-        </section>
       </div>
     </>
   )

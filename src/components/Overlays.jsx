@@ -3,22 +3,19 @@ import { X, Check, Info } from 'lucide-react'
 import { useStore } from '../store.js'
 
 const SHORTCUTS = [
+  ['S', 'La semana'],
+  ['M', 'Metro: el plano de la demanda'],
+  ['A', 'Dónde abrir'],
+  ['X', 'Simulador'],
+  ['U', 'Turismo'],
+  ['T', 'Empezar o salir del tour'],
   ['Espacio', 'Reproducir o pausar la semana'],
   ['1 – 5', 'Ir de lunes a viernes'],
   ['← →', 'Día anterior / siguiente'],
   ['Ctrl K  ·  /', 'Buscar barrio o acción'],
-  ['T', 'Empezar o salir del tour'],
-  ['M', 'Plano de metro de la demanda'],
-  ['E', 'Barcelona en movimiento'],
-  ['V', 'Vuelo cinematográfico'],
-  ['L', 'Mapa: capas y colores'],
-  ['R  G  B  N', 'Análisis: ranking, distritos, burbujas, hallazgos'],
-  ['I', 'Datos: periodo, viajeros, importar y exportar'],
-  ['D', 'Comparar el día con el lunes'],
   ['O', 'Órbita automática de la cámara'],
   ['H', 'Volver a la vista inicial'],
   ['P', 'Descargar una captura'],
-  ['C', 'Comparar el barrio seleccionado'],
   ['Esc', 'Cerrar lo que esté abierto'],
 ]
 

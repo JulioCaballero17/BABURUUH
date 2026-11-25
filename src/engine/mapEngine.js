@@ -8,10 +8,11 @@ import { buildStyle, rampExpr, PLANO, PLANO_LAYERS, LABEL_LAYERS } from './mapSt
 import { buildDeckLayers, buildTrips } from './deckLayers.js'
 import { BARRIOS, N, HEXES } from '../model/geo.js'
 import { STEPS } from '../model/simulate.js'
-import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, hexToRgb, mix, rgbStr } from '../lib/colors.js'
+import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, RAMP_SCORE, hexToRgb, mix, rgbStr } from '../lib/colors.js'
 import { visitorShares, shareRange, periodRatio } from '../model/derive.js'
 import { buildMetro } from './metro.js'
-import { buildParticles } from './particles.js'
+import { getScores, getSim, getVisitors, simPlaceOf } from './toolState.js'
+import { SCENARIOS } from '../model/tools.js'
 import { sunAt, dayOf } from '../lib/week.js'
 import { clamp, smoothstep } from '../lib/format.js'
 
@@ -57,9 +58,6 @@ const E = {
   metro: null,
   metroKey: '',
   metroT: 0,
-  particles: null,
-  partKey: '',
-  partT: 0,
   dimLast: -1,
 }
 export const getMetro = () => E.metro
@@ -126,6 +124,7 @@ function wireEvents() {
     const s = useStore.getState()
     if (s.intro !== 'done') return
     const p = pick(e.point)
+    if (s.view === 'simular' && p && p.i != null && SCENARIOS.find((x) => x.key === s.scenario)?.place) { s.setSimPlace(p.i); return }
     if (p && p.i != null) selectBarrio(p.i === s.sel ? -1 : p.i)
     else if (!p && s.sel >= 0) selectBarrio(-1)
   })
@@ -212,7 +211,9 @@ function sampleElevation() {
 }
 
 /* ------------------------------------------------------------------ discrete state → style */
-const RAMPS = { activity: RAMP_ACTIVITY, delta: RAMP_DELTA, period: RAMP_DELTA, visitors: RAMP_VISITORS, bubble: RAMP_BUBBLE, influence: RAMP_INFLUENCE }
+const RAMPS = { activity: RAMP_ACTIVITY, delta: RAMP_DELTA, period: RAMP_DELTA, visitors: RAMP_VISITORS, bubble: RAMP_BUBBLE, influence: RAMP_INFLUENCE, score: RAMP_SCORE, sim: RAMP_DELTA }
+// the colour mode follows the tool that is open
+export const modeOf = (s) => ({ abrir: 'score', simular: 'sim', turismo: 'visitors' })[s.view] || (s.colorMode === 'influence' && s.sel >= 0 ? 'influence' : 'activity')
 function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none') }
 
 function applyDiscrete(s, force = false) {
@@ -259,8 +260,8 @@ function applyDiscrete(s, force = false) {
       if (!L.terrain) { E.elev = new Float32Array(N); E.elevKey = 'flat'; E.tripsKey = '' }
     }
   }
-  if (force || prev.colorMode !== s.colorMode) {
-    const ramp = RAMPS[s.colorMode] || RAMP_ACTIVITY
+  if (force || prev.colorMode !== modeOf(s)) {
+    const ramp = RAMPS[modeOf(s)] || RAMP_ACTIVITY
     map.setPaintProperty('barrios-fill', 'fill-color', rampExpr(ramp))
     map.setPaintProperty('barrios-3d', 'fill-extrusion-color', rampExpr(ramp))
     map.setPaintProperty('hex-ext', 'fill-extrusion-color', rampExpr(s.colorMode === 'delta' ? RAMP_DELTA : RAMP_ACTIVITY))
@@ -271,7 +272,7 @@ function applyDiscrete(s, force = false) {
     const src = map.getSource('bicing')
     if (src && s.bicing) src.setData(s.bicing.geojson)
   }
-  E.discrete = { basemap: s.basemap, dark, layers: L, colorMode: s.colorMode, bicing: s.bicing, intro: s.intro, terrain: L.terrain }
+  E.discrete = { basemap: s.basemap, dark, layers: L, colorMode: modeOf(s), bicing: s.bicing, intro: s.intro, terrain: L.terrain }
   E.lightKey = ''
 }
 
@@ -324,8 +325,12 @@ function updateBarrios(s, t, grow) {
   const ds = s.dataset
   const [D0, D1, f] = interp(ds.DENS, t)
   const day = dayOf(t)
-  const mode = s.colorMode
+  const mode = modeOf(s)
   const sel = s.sel
+  const score = mode === 'score' ? getScores(s) : null
+  const sim = mode === 'sim' ? getSim(s) : null
+  const vis = mode === 'visitors' ? getVisitors(s) : null
+  const simPlace = sim ? simPlaceOf(s) : -1
   let shares = null
   let shareMax = 1
   if (mode === 'influence' && sel >= 0) {
@@ -339,10 +344,6 @@ function updateBarrios(s, t, grow) {
   }
   let vShares = null
   let vRange = [0, 1]
-  if (mode === 'visitors') {
-    vShares = visitorShares(ds, day, s.visitorKind)
-    if (vShares) vRange = shareRange(vShares, ds, day)
-  }
   const pr = mode === 'period' ? periodRatio(s.summary, ds.source.periodId, s.comparePeriod, s.segment) : null
   let bMin = 1
   let bMax = 0
@@ -360,7 +361,12 @@ function updateBarrios(s, t, grow) {
     } else if (mode === 'period') {
       v = pr ? (clamp(Math.log2((pr.cur[i] + 0.5) / (pr.ref[i] + 0.5)) / 1.1, -1, 1) + 1) / 2 : 0.5
     } else if (mode === 'visitors') {
-      v = vShares ? clamp((vShares[i] - vRange[0]) / (vRange[1] - vRange[0])) : 0
+      v = vis ? clamp((vis.share[i] - vis.lo) / (vis.hi - vis.lo)) : 0
+    } else if (mode === 'score') {
+      v = score.score[i]
+      dim = ds.pop[i] < 1
+    } else if (mode === 'sim') {
+      v = (clamp(Math.log2((sim.sim[i] + 50) / (sim.base[i] + 50)) / 1.2, -1, 1) + 1) / 2
     } else if (mode === 'bubble') {
       v = bMax > bMin ? (ds.metrics[i].bub[day] - bMin) / (bMax - bMin) : 0
     } else if (shares) {
@@ -369,8 +375,11 @@ function updateBarrios(s, t, grow) {
     } else {
       v = Math.pow(base, 0.7)
     }
-    const h = Math.pow(base, 0.85) * MAX_H * grow + 6
-    map.setFeatureState({ source: 'barrios', id: i }, { v, h: dim ? 6 : h, sel: i === sel, hov: i === hov, dim })
+    let h = Math.pow(base, 0.85) * MAX_H * grow + 6
+    // in the tools, the height tells the answer: best places stand tall, simulated arrivals rise or sink
+    if (score) h = Math.pow(score.score[i], 2.2) * MAX_H * 1.1 * grow + 6
+    if (sim) h = Math.pow(clamp(sim.sim[i] / BARRIOS[i].area / ds.densRef), 0.85) * MAX_H * grow + 6
+    map.setFeatureState({ source: 'barrios', id: i }, { v, h: dim ? 6 : h, sel: i === sel || i === simPlace, hov: i === hov, dim })
   }
 }
 
@@ -445,7 +454,7 @@ function frame(now) {
 
   // discrete style changes
   const d = E.discrete
-  if (!d || d.basemap !== s.basemap || d.layers !== s.layers || d.colorMode !== s.colorMode || d.bicing !== s.bicing || d.intro !== s.intro || d.dark !== selectDark(s)) applyDiscrete(s)
+  if (!d || d.basemap !== s.basemap || d.layers !== s.layers || d.colorMode !== modeOf(s) || d.bicing !== s.bicing || d.intro !== s.intro || d.dark !== selectDark(s)) applyDiscrete(s)
 
   const t = s.t
   const sun = sunAt(t)
@@ -453,7 +462,7 @@ function frame(now) {
   applyLighting(sun, s)
 
   const grow = s.intro === 'done' ? (reduceMotion ? 1 : smoothstep((now - E.growStart - 300) / 2600)) : 0
-  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}|${s.comparePeriod}|${!!s.summary}|${s.visitorKind}`
+  const key = `${t.toFixed(3)}|${s.colorMode}|${s.sel}|${s.hover?.i ?? -1}|${s.dataset.version}|${s.deltaBase}|${s.influenceDir}|${grow.toFixed(3)}|${s.comparePeriod}|${!!s.summary}|${s.visitorKind}|${s.view}|${s.business}|${s.scenario}|${s.simPlace}|${s.simAmount}`
   if (key !== E.stateKey) { E.stateKey = key; updateBarrios(s, t, grow) }
   if (s.layers.hex) {
     const hk = `${t.toFixed(3)}|${s.dataset.version}|${grow.toFixed(3)}|${s.colorMode}|${s.deltaBase}`
@@ -466,28 +475,17 @@ function frame(now) {
 
   // special views: the metro plan and the particles
   const metroOn = s.intro === 'done' && s.view === 'metro'
-  const partOn = s.intro === 'done' && s.view === 'flujo'
   // real elapsed time (not capped) so the transitions take the same time on slow machines
   const rdt = Math.min(0.25, (now - (E.viewNow || now)) / 1000)
   E.viewNow = now
   E.metroT = clamp(E.metroT + (metroOn ? 1 : -1) * rdt * (reduceMotion ? 50 : 0.7))
-  E.partT = clamp(E.partT + (partOn ? 1 : -1) * rdt * (reduceMotion ? 50 : 1.1))
-  if (s.intro === 'done' && E.metroKey !== s.dataset.version) {
-    E.metroKey = s.dataset.version
-    E.metro = buildMetro(s.dataset)
+  const mk = `${s.dataset.version}|${s.metroVariant}`
+  if (s.intro === 'done' && E.metroKey !== mk) {
+    E.metroKey = mk
+    E.metro = buildMetro(s.metroVariant === 'visit' && s.dataset.segF ? visitorFlows(s.dataset) : s.dataset)
     useStore.setState({ metroLines: E.metro.lines.map((l) => ({ id: l.id, name: l.name, color: l.color, stations: l.stations, load: l.load })) })
   }
-  const pday = Math.round(t) % STEPS
-  const pk = `${s.dataset.version}|${pday}`
-  if ((partOn || E.partT > 0) && E.partKey !== pk) {
-    E.partKey = pk
-    const seg = s.dataset.segF
-    const flows = seg ? Object.fromEntries(Object.keys(seg).filter((n) => s.segment === 'all' || n === s.segment).map((n) => [n, seg[n][pday]])) : { all: s.dataset.F[pday] }
-    const lite = document.documentElement.classList.contains('lowfx') || isMobile()
-    E.particles = buildParticles(flows, lite ? 7000 : 15000)
-    useStore.setState({ particleInfo: { perDot: E.particles.perDot, total: E.particles.total, segments: E.particles.segments } })
-  }
-  const dim = Math.max(smoothstep(E.metroT) * 0.9, smoothstep(E.partT) * 0.74)
+  const dim = smoothstep(E.metroT) * 0.9
   if (Math.abs(dim - E.dimLast) > 0.004 || (dim === 0 && E.dimLast !== 0)) {
     E.dimLast = dim
     // 3D layers are drawn after flat ones, so they are faded directly instead of covered
@@ -501,7 +499,7 @@ function frame(now) {
 
   const zoom = map.getZoom()
   if (Math.abs(zoom - s.zoom) > 0.05) useStore.setState({ zoom })
-  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow, metro: E.metro, metroT: E.metroT, particles: E.particles, partT: E.partT }) })
+  if (overlay) overlay.setProps({ layers: buildDeckLayers({ s, trips: E.trips, elev: E.elev, now, zoom, grow, metro: E.metro, metroT: E.metroT, sim: s.view === 'simular' ? getSim(s) : null }) })
 
   // adaptive quality: on slow GPUs, drop the glass blur (the most expensive effect over a live map)
   if (s.intro === 'done' && !E.qualityDone) {
@@ -576,9 +574,23 @@ export async function capturePNG({ title, subtitle, legend }) {
 // mapa = the normal map · metro = the metro plan drawn from the demand · flujo = moving particles
 export function setView(view) {
   const s = useStore.getState()
-  if (s.view === view) view = 'mapa'
-  useStore.setState({ view, metroFocus: -1, ...(view !== 'mapa' ? { sel: -1, orbit: false } : {}) })
+  if (s.view === view && view !== 'mapa') view = 'mapa'
+  const wasMetro = s.view === 'metro'
+  useStore.setState({ view, metroFocus: -1, orbit: false, playing: false, ...(view !== 'mapa' ? { sel: -1 } : {}), ...(view !== 'metro' ? { metroVariant: 'all' } : {}) })
   if (view === 'metro') flyTo(isMobile() ? { center: [2.17, 41.405], zoom: 11.2, pitch: 0, bearing: 0 } : { center: [2.172, 41.403], zoom: 12.35, pitch: 0, bearing: 0 }, 2200)
-  else if (view === 'flujo') flyTo({ center: [2.165, 41.398], zoom: isMobile() ? 11.4 : 12.45, pitch: 48, bearing: -16 }, 2200)
-  else flyTo(HOME(), 2000)
+  else if (view === 'abrir') flyTo({ center: [2.165, 41.395], zoom: isMobile() ? 11.3 : 12.3, pitch: 55, bearing: -22 }, 2000)
+  else if (view === 'simular') { if (getSim(useStore.getState()).place < 0) flyTo(HOME(), 2000) }
+  else if (view === 'turismo') flyTo({ center: [2.172, 41.392], zoom: isMobile() ? 11.6 : 12.6, pitch: 55, bearing: -15 }, 2000)
+  else if (wasMetro) flyTo(HOME(), 2000)
+}
+
+// Flows of visitors only (rest of Catalonia, Spain and abroad), to draw "the metro of the visitors".
+function visitorFlows(ds) {
+  const names = ['Regional', 'Nacional', 'Internacional'].filter((n) => ds.segF[n])
+  const F = ds.F.map((_, d) => {
+    const M = new Float32Array(N * N)
+    for (const n of names) { const a = ds.segF[n][d]; for (let k = 0; k < N * N; k++) M[k] += a[k] }
+    return M
+  })
+  return { ...ds, F }
 }

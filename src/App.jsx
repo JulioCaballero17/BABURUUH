@@ -2,20 +2,17 @@ import { useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { useStore, selectDark } from './store.js'
 import { readHash } from './lib/url.js'
-import { useShortcuts, useBicing, useHashSync } from './hooks.js'
+import { useShortcuts, useHashSync } from './hooks.js'
 import MapCanvas from './components/MapCanvas.jsx'
 import Intro from './components/Intro.jsx'
 import TopBar from './components/TopBar.jsx'
-import Rail from './components/Rail.jsx'
-import SidePanel from './components/SidePanel.jsx'
+import ToolPanel from './components/ToolPanel.jsx'
 import BarrioDrawer from './components/BarrioDrawer.jsx'
 import MapControls from './components/MapControls.jsx'
 import Dock from './components/Dock.jsx'
 import Tooltip from './components/Tooltip.jsx'
 import Tour from './components/Tour.jsx'
-import Cinema from './components/Cinema.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
-import CompareModal from './components/CompareModal.jsx'
 import { HelpOverlay, Toasts } from './components/Overlays.jsx'
 
 // Restore a shared view from the URL before the first render.
@@ -29,7 +26,9 @@ if (HASH) {
     ...(HASH.deltaBase != null ? { deltaBase: HASH.deltaBase } : {}),
     ...(HASH.period ? { period: HASH.period } : {}),
     ...(HASH.segment ? { segment: HASH.segment } : {}),
-    ...(HASH.comparePeriod ? { comparePeriod: HASH.comparePeriod } : {}),
+    ...(HASH.view ? { view: HASH.view } : {}),
+    ...(HASH.business ? { business: HASH.business } : {}),
+    ...(HASH.scenario ? { scenario: HASH.scenario } : {}),
     ...(HASH.visitorKind ? { visitorKind: HASH.visitorKind } : {}),
     layers: { ...s.layers, ...(HASH.layers || {}), ...(HASH.barrios ? { barrios: HASH.barrios } : {}) },
   })
@@ -41,34 +40,29 @@ useStore.getState().loadReal().then(() => useStore.getState().loadSummary())
 export default function App() {
   const dark = useStore(selectDark)
   const intro = useStore((s) => s.intro)
-  const cinema = useStore((s) => s.cinema.active)
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light'
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#17191C' : '#F7F8F6')
   }, [dark])
   useShortcuts()
-  useBicing()
   useHashSync()
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className={`app ${cinema ? 'cinema' : ''}`}>
+      <div className="app">
         <MapCanvas startCam={HASH?.cam} />
         <Intro />
         {intro === 'done' && (
           <>
             <TopBar />
-            <Rail />
-            <SidePanel />
+            <ToolPanel />
             <BarrioDrawer />
             <MapControls />
             <Dock />
             <Tooltip />
             <Tour />
-            <Cinema />
             <CommandPalette />
-            <CompareModal />
             <HelpOverlay />
           </>
         )}
