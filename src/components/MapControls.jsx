@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Minus, Compass, Box, Orbit, Video, Info, ArrowUpFromLine, Satellite, Map as MapIcon } from 'lucide-react'
+import { Plus, Minus, Compass, Box, Orbit, Video, Info, ArrowUpFromLine, Satellite, Map as MapIcon, Pause, Play } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store.js'
 import { zoomBy, resetNorth, togglePitch, getMap, flyPreset, PRESETS } from '../engine/mapEngine.js'
@@ -89,6 +89,7 @@ export default function MapControls() {
   const sel = useStore((s) => s.sel)
   const orbit = useStore((s) => s.orbit)
   const basemap = useStore((s) => s.basemap)
+  const paused = useStore((s) => s.motionPaused)
   const setOrbit = useStore((s) => s.setOrbit)
   const [presets, setPresets] = useState(false)
   const compass = useRef(null)
@@ -118,6 +119,7 @@ export default function MapControls() {
         <button className="icon-btn" onClick={resetNorth} aria-label="Orientar al norte" title="Orientar al norte"><Compass ref={compass} className="compass" /></button>
         <button className="icon-btn" onClick={togglePitch} aria-label="Cambiar entre vista 2D y 3D" title="2D / 3D"><Box /></button>
         <button className="icon-btn" aria-pressed={orbit} onClick={() => setOrbit(!orbit)} aria-label="Órbita automática" title="Órbita automática (O)"><Orbit /></button>
+        <button className="icon-btn" onClick={() => useStore.setState({ motionPaused: !paused })} aria-label={paused ? 'Reanudar las luces de los viajes' : 'Pausar las luces de los viajes'} title={paused ? 'Reanudar el movimiento' : 'Pausar el movimiento'}>{paused ? <Play /> : <Pause />}</button>
         <button className="icon-btn" onClick={() => useStore.getState().setBasemap(basemap === 'satelite' ? 'mapa' : 'satelite')} aria-label={basemap === 'satelite' ? 'Cambiar a plano' : 'Cambiar a satélite'} title={basemap === 'satelite' ? 'Ver plano' : 'Ver satélite'}>{basemap === 'satelite' ? <MapIcon /> : <Satellite />}</button>
         <button className="icon-btn" aria-expanded={presets} onClick={() => setPresets((p) => !p)} aria-label="Cámaras" title="Cámaras"><Video /></button>
         <AnimatePresence>

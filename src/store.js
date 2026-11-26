@@ -34,6 +34,9 @@ export const useStore = create((set, get) => ({
   simPlace: -1, // -1 = the scenario's default barrio
   simAmount: null, // null = the scenario's default amount
   simShow: 'after', // before | after (compare today with the simulated day)
+  report: -1, // barrio whose printable report is open
+  presenting: false, // presentation mode: no panels, the five modes one after another
+  motionPaused: typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, // travelling lights on the map
 
   // ---------- time (in days: 0 = Monday … 4 = Friday; fractional only while animating) ----------
   t: 0,

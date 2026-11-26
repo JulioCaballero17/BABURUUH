@@ -120,7 +120,7 @@ export function buildTour(ds, st) {
     {
       id: 'abrir-2',
       title: 'Cambia el negocio, cambia el mapa',
-      body: `Una tienda para turistas no busca lo mismo: aquí el podio es **${names(turista.top.map((t) => t.i))}**, porque es donde se concentra el visitante de fuera. Cada puesto explica **por qué**.`,
+      body: `Una tienda para turistas no busca lo mismo: aquí el podio es **${names(turista.top.map((t) => t.i))}**, porque es donde se concentra el visitante de fuera. Debajo, la nota se **desglosa** indicador a indicador.`,
       target: 'podium', badge: 'El podio', place: 'top-right',
       state: { t: 1, view: 'abrir', business: 'turista' }, cam: { center: [2.172, 41.388], zoom: 12.8, pitch: 55, bearing: -10 },
     },
@@ -162,7 +162,7 @@ export function buildTour(ds, st) {
     {
       id: 'compartir',
       title: 'Guárdalo y compártelo',
-      body: 'Busca cualquier barrio con **Ctrl K**, descarga una **captura** con su leyenda o copia un **enlace** que abre exactamente esta vista.',
+      body: 'Busca cualquier barrio con **Ctrl K**, descarga una **captura** o copia un **enlace** a esta vista. Cada ficha de barrio tiene un **informe PDF**, y el botón de pantalla lanza el **modo presentación** (tecla V).',
       target: 'actions', badge: 'Buscar, capturar, compartir', place: 'top-right',
       state: { t: 1 }, cam: HOME,
     },

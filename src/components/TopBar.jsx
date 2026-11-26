@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route, CalendarDays, TrainFront, Store, FlaskConical, Luggage } from 'lucide-react'
+import { Search, Camera, Link2, Sun, Moon, CircleHelp, Route, Presentation, CalendarDays, TrainFront, Store, FlaskConical, Luggage } from 'lucide-react'
 import { setView } from '../engine/mapEngine.js'
 import { useStore, selectDark } from '../store.js'
 import { BrandMark } from './ui/primitives.jsx'
@@ -83,6 +83,7 @@ export default function TopBar() {
           <Route aria-hidden="true" /> {tourOn ? 'Salir' : 'Tour'}
         </button>
         <span className="divider-v" />
+        <button className="icon-btn hide-m" data-tour="present" onClick={() => useStore.setState({ presenting: true })} aria-label="Modo presentación" title="Modo presentación (V)"><Presentation /></button>
         <button className="icon-btn hide-m" data-tour="capture" onClick={downloadCapture} aria-label="Descargar captura del mapa" title="Descargar captura (P)"><Camera /></button>
         <button className="icon-btn hide-m" data-tour="share" onClick={copyLink} aria-label="Copiar enlace a esta vista" title="Copiar enlace a esta vista"><Link2 /></button>
         <button className="icon-btn" onClick={() => setTheme(dark ? 'light' : 'dark')} aria-label={dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} title={dark ? 'Tema claro' : 'Tema oscuro'}>{dark ? <Sun /> : <Moon />}</button>

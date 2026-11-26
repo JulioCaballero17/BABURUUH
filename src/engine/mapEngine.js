@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useStore, selectDark } from '../store.js'
 import { buildStyle, rampExpr, PLANO, PLANO_LAYERS, LABEL_LAYERS } from './mapStyle.js'
-import { buildDeckLayers, buildTrips, buildFlowComets } from './deckLayers.js'
+import { buildDeckLayers, buildTrips, buildFlowComets, visibleWires } from './deckLayers.js'
 import { BARRIOS, N, HEXES } from '../model/geo.js'
 import { STEPS } from '../model/simulate.js'
 import { RAMP_ACTIVITY, RAMP_DELTA, RAMP_BUBBLE, RAMP_INFLUENCE, RAMP_VISITORS, RAMP_SCORE, hexToRgb, mix, rgbStr } from '../lib/colors.js'
@@ -119,6 +119,8 @@ function wireEvents() {
   map.on('mousemove', (e) => {
     const s = useStore.getState()
     if (s.intro !== 'done') return
+    const ray = pickWire(e.point)
+    if (ray) { map.getCanvas().style.cursor = 'help'; s.setHover({ ray, x: e.point.x, y: e.point.y }); return }
     const p = pick(e.point)
     map.getCanvas().style.cursor = p ? 'pointer' : ''
     if (!p) { if (s.hover) s.setHover(null); return }
@@ -149,6 +151,53 @@ export function flyTo(cam, duration = 2400) {
   map.once('moveend', () => { E.flying = false })
 }
 export function flyHome() { flyTo(HOME(), 2000) }
+
+// The wire (route between two barrios) under the pointer, tested on the CPU against the projected arcs.
+function pickWire(pt, radius = 6) {
+  const vp = overlay?._deck?.getViewports?.()[0]
+  if (!vp) return null
+  let best = null
+  let bestD = radius * radius
+  for (const id of Object.keys(visibleWires)) {
+    for (const w of visibleWires[id]) {
+      let prev = null
+      for (const p of w.path) {
+        const q = vp.project(p)
+        if (prev) {
+          const dx = q[0] - prev[0]
+          const dy = q[1] - prev[1]
+          const L = dx * dx + dy * dy || 1
+          const u = Math.max(0, Math.min(1, ((pt.x - prev[0]) * dx + (pt.y - prev[1]) * dy) / L))
+          const ex = prev[0] + u * dx - pt.x
+          const ey = prev[1] + u * dy - pt.y
+          const d = ex * ex + ey * ey
+          if (d < bestD) { bestD = d; best = { i: w.i, j: w.j, v: w.v, trips: id === 'trips', wire: w } }
+        }
+        prev = q
+      }
+    }
+  }
+  return best
+}
+
+// Fly to a barrio and hand back a picture of the map (for the printable report).
+export function snapshotBarrio(i) {
+  return new Promise((resolve) => {
+    if (!map) { resolve(null); return }
+    let finished = false
+    const done = () => {
+      if (finished) return
+      finished = true
+      clearTimeout(guard)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        try { resolve(map.getCanvas().toDataURL('image/jpeg', 0.86)) } catch { resolve(null) }
+      }))
+    }
+    const guard = setTimeout(done, 3500)
+    map.once('moveend', () => setTimeout(done, 700)) // a moment for the tiles of the new view
+    flyTo({ center: BARRIOS[i].c, zoom: 13.4, pitch: 56, bearing: -24 }, 1200)
+  })
+}
 export function flyPreset(key) { const p = PRESETS[key]; if (p) flyTo(p.cam(), 2600) }
 
 export function selectBarrio(i, { fly = true } = {}) {
@@ -190,7 +239,10 @@ export function skipIntro() {
 function finishIntro() {
   if (useStore.getState().intro === 'done') return
   map.setProjection({ type: 'mercator' })
-  overlay = new MapboxOverlay({ interleaved: true, layers: [] })
+  overlay = new MapboxOverlay({
+    interleaved: true,
+    layers: [],
+  })
   map.addControl(overlay)
   E.growStart = performance.now()
   useStore.setState({ intro: 'done' })
@@ -512,7 +564,7 @@ function frame(now) {
     E.cometKey = ck
     E.comets = null
     if (ck.startsWith('sim')) E.comets = buildFlowComets(sim.allFlows, Float32Array.from(E.heights), E.elev, { count: 900 })
-    else if (ck.startsWith('vis')) E.comets = buildFlowComets(visitorTopFlows(s), Float32Array.from(E.heights), E.elev, { count: 800, color: [255, 120, 180] })
+    else if (ck.startsWith('vis')) E.comets = buildFlowComets(visitorTopFlows(s), Float32Array.from(E.heights), E.elev, { count: 800, color: [255, 170, 205] })
     else if (ck.startsWith('abr')) {
       const focus = s.sel >= 0 ? s.sel : getScores(s).top[0]?.i
       if (focus != null) E.comets = buildFlowComets(catchment(s, focus, 72).map((o) => ({ i: o.j, j: focus, v: o.v })), Float32Array.from(E.heights), E.elev, { count: 500 })

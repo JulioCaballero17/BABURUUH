@@ -88,7 +88,9 @@ export function siteScores(ds, key) {
     const best = [...b.parts].sort((x, y) => ranks[y[0]][i] * y[1] - ranks[x[0]][i] * x[1])
     return best.slice(0, 2).filter(([k]) => ranks[k][i] > 0.6).map(([, , txt]) => txt)
   }
-  return { business: b, score, order, top: order.slice(0, 3).map((i) => ({ i, score: score[i], why: why(i) })), why }
+  // how each indicator adds up to the final mark of a barrio (for the breakdown in the panel)
+  const detail = (i) => b.parts.map(([k, w, txt]) => ({ k, w, txt, rank: ranks[k][i], pts: w * ranks[k][i] }))
+  return { business: b, score, order, top: order.slice(0, 3).map((i) => ({ i, score: score[i], why: why(i) })), why, detail }
 }
 
 /* ------------------------------------------------------------------ Simulador */

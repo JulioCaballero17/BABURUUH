@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, LocateFixed } from 'lucide-react'
+import { X, LocateFixed, FileText } from 'lucide-react'
 import { useStore, selectDark } from '../store.js'
 import { BARRIOS } from '../model/geo.js'
 import { topFrom, topTo } from '../model/derive.js'
@@ -62,6 +62,7 @@ function Body({ i }) {
         </div>
         <div className="drawer-tools">
           <button className="btn sm ghost" onClick={() => flyTo({ center: b.c, zoom: 14.4, pitch: 66 }, 1800)}><LocateFixed /> Acercar</button>
+          <button className="btn sm ghost" data-tour="report-btn" onClick={() => useStore.setState({ report: i })}><FileText /> Informe PDF</button>
         </div>
       </div>
 

@@ -12,6 +12,8 @@ import MapControls from './components/MapControls.jsx'
 import Dock from './components/Dock.jsx'
 import Tooltip from './components/Tooltip.jsx'
 import Tour from './components/Tour.jsx'
+import Report from './components/Report.jsx'
+import Presenter from './components/Presenter.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import { HelpOverlay, Toasts } from './components/Overlays.jsx'
 
@@ -64,6 +66,8 @@ export default function App() {
             <Tour />
             <CommandPalette />
             <HelpOverlay />
+            <Report />
+            <Presenter />
           </>
         )}
         <Toasts />

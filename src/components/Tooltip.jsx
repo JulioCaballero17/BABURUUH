@@ -22,6 +22,21 @@ export default function Tooltip() {
   const h = window.innerHeight
   const style = { left: Math.min(hover.x, w - 290), top: Math.min(hover.y, h - 220) }
 
+  if (hover.ray) {
+    const r = hover.ray
+    const view = useStore.getState().view
+    const label = r.trips ? `Viajes · ${DAYS[d].name.toLowerCase()}`
+      : view === 'simular' ? (r.v >= 0 ? 'Viajes nuevos' : 'Viajes que desaparecen')
+      : view === 'abrir' ? 'Clientes posibles al día'
+      : view === 'turismo' ? 'Visitantes al día' : 'Viajes al día'
+    return (
+      <div className="tip glass" style={style} role="tooltip">
+        <p className="eyebrow" style={{ margin: 0 }}>Trayecto</p>
+        <h4>{BARRIOS[r.i].short} <span aria-hidden="true">→</span><span className="sr-only">hacia</span> {BARRIOS[r.j].short}</h4>
+        <div className="r"><span>{label}</span><b>{fmt(Math.abs(r.v))}</b></div>
+      </div>
+    )
+  }
   if (hover.station) {
     const st = hover.station
     return (

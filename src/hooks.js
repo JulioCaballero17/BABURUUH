@@ -13,6 +13,7 @@ export function useShortcuts() {
     const onKey = (e) => {
       const s = useStore.getState()
       if (s.intro !== 'done') return
+      if (s.presenting || s.report >= 0) return // the presentation and the report dialog handle their own keys
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); s.setCmdk(!s.cmdk); return }
       if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === 'Escape') {
@@ -39,6 +40,7 @@ export function useShortcuts() {
       if (k === 'o') s.setOrbit(!s.orbit)
       else if (k === 'h') flyHome()
       else if (k === 'p') downloadCapture()
+      else if (k === 'v') useStore.setState({ presenting: true })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

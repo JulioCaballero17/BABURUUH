@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { X, UtensilsCrossed, ShoppingBag, Briefcase, Store, Ticket, Construction, Laptop, MousePointerClick, TrainFront, ArrowRight, RotateCcw, Play, Pause } from 'lucide-react'
 import { useStore } from '../store.js'
 import { BARRIOS } from '../model/geo.js'
-import { BUSINESSES, SCENARIOS, VISITOR_KINDS, visitorSeason } from '../model/tools.js'
+import { BUSINESSES, SCENARIOS, VISITOR_KINDS, visitorSeason, simulate, findBarrio } from '../model/tools.js'
 import { getScores, getSim, getVisitors, catchment } from '../engine/toolState.js'
 import { selectBarrio, setView, flyTo, replaySim } from '../engine/mapEngine.js'
 import { DAYS } from '../lib/colors.js'
@@ -57,8 +57,39 @@ function AbrirPanel() {
         </ol>
         <p className="note" style={{ marginTop: 10 }}>{res.business.desc} Se calcula con cuánta gente llega, quién es y qué día viene, según los datos de movilidad.</p>
       </section>
+      <Breakdown res={res} i={sel >= 0 ? sel : res.top[0]?.i} />
       <Customers focus={sel >= 0 ? sel : res.top[0]?.i} />
     </>
+  )
+}
+
+// The mark of one barrio, indicator by indicator: nothing hidden, every point traceable to the data.
+const RANK_TXT = (r) => (r >= 0.9 ? 'de los mejores' : r >= 0.66 ? 'por encima de la media' : r >= 0.33 ? 'en la media' : 'por debajo de la media')
+function Breakdown({ res, i }) {
+  if (i == null || !res.score[i]) return null
+  const pos = res.order.indexOf(i) + 1
+  const parts = res.detail(i)
+  const maxW = Math.max(...parts.map((p) => p.w))
+  return (
+    <section data-tour="breakdown">
+      <div className="section-title"><h3>Por qué {BARRIOS[i].short} saca un {Math.round(res.score[i] * 100)}</h3><span>puesto {pos} de {res.order.length}</span></div>
+      <ul className="breakdown">
+        {parts.map((p) => (
+          <li key={p.k}>
+            <div className="bd-head"><span>{p.txt[0].toUpperCase() + p.txt.slice(1)}</span><b>+{Math.round(p.pts * 100)}</b></div>
+            <div className="bd-track" style={{ '--wt': p.w / maxW }} role="img" aria-label={`${RANK_TXT(p.rank)}: mejor que el ${Math.round(p.rank * 100)} % de los barrios`}>
+              <i style={{ '--r': p.rank }} />
+            </div>
+            <div className="bd-foot"><span>Mejor que el {Math.round(p.rank * 100)} % de los barrios</span><span>pesa {Math.round(p.w * 100)} %</span></div>
+          </li>
+        ))}
+      </ul>
+      <details className="how">
+        <summary>Cómo se calcula la nota</summary>
+        <p>Para cada indicador ordenamos los {res.order.length} barrios con gente viviendo de peor a mejor: estar arriba del todo vale 1 y abajo del todo, 0. Así comparamos cosas distintas (personas por km², porcentajes, días) en la misma escala y un barrio extremo no lo distorsiona todo.</p>
+        <p>La nota es la suma de cada posición por su peso, sobre 100. Los pesos los fijamos según lo que necesita cada tipo de negocio. Todo sale de los datos de movilidad de Telefónica, media de los días laborables del periodo elegido.</p>
+      </details>
+    </section>
   )
 }
 
@@ -214,8 +245,43 @@ function SimPanel() {
           <p className="note" style={{ marginTop: 8 }}>Carga extra en cada línea del plano Metro, repartiendo los viajes del escenario por las rutas entre barrios vecinos. En el mapa brillan las rutas que más se cargan.</p>
         </section>
       )}
+      <CompareScenarios scenario={scenario} place={place} amount={r.amount} day={day} ds={ds} />
       <p className="note">Simulación para un {dn} medio, a partir de los patrones reales de movilidad. Es una estimación, no una predicción.</p>
     </>
+  )
+}
+
+// The three scenarios side by side: the current one with your settings, the others with their defaults.
+function CompareScenarios({ scenario, place, amount, day, ds }) {
+  const setScenario = useStore((s) => s.setScenario)
+  const rows = useMemo(() => SCENARIOS.map((sc) => {
+    const own = sc.key === scenario
+    const pl = sc.place ? (own ? place : findBarrio(sc.place)) : -1
+    const am = own ? amount : sc.amount.value
+    const r = simulate(ds, sc.key, { place: pl, amount: am, day })
+    const total = r.base.reduce((x, y) => x + y, 0) || 1
+    const moved = r.allFlows.reduce((x, f) => x + Math.abs(f.v), 0)
+    const cand = [...r.change.keys()].filter((i) => r.base[i] > 300)
+    const top = cand.sort((x, y) => Math.abs(r.change[y]) - Math.abs(r.change[x]))[0]
+    return { sc, own, pl, am, moved, share: moved / total, top, topChange: r.change[top] }
+  }), [scenario, place, amount, day, ds])
+  return (
+    <details className="how" data-tour="sim-compare-all">
+      <summary>Comparar los tres escenarios</summary>
+      <table className="cmp">
+        <caption className="sr-only">Comparación de escenarios para un {DAYS[day].name.toLowerCase()} medio</caption>
+        <thead>
+          <tr><th scope="col"><span className="sr-only">Indicador</span></th>{rows.map((x) => <th key={x.sc.key} scope="col" aria-current={x.own || undefined}>{x.sc.label}</th>)}</tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Ajuste</th>{rows.map((x) => <td key={x.sc.key}>{x.sc.amount.fmt(x.am)}{x.pl >= 0 && <small>{BARRIOS[x.pl].short}</small>}</td>)}</tr>
+          <tr><th scope="row">Viajes que cambian</th>{rows.map((x) => <td key={x.sc.key}><b>{fmtK(x.moved)}</b><small>{pct(x.share, 1)} del día</small></td>)}</tr>
+          <tr><th scope="row">Barrio más afectado</th>{rows.map((x) => <td key={x.sc.key}>{x.top != null ? <>{BARRIOS[x.top].short}<small className={x.topChange < 0 ? 'neg' : 'pos'}>{x.topChange >= 0 ? '+' : '−'}{pct(Math.abs(x.topChange))}</small></> : '—'}</td>)}</tr>
+          <tr><td />{rows.map((x) => <td key={x.sc.key}>{x.own ? <span className="cmp-now">En el mapa</span> : <button className="btn sm ghost" onClick={() => setScenario(x.sc.key)}>Ver</button>}</td>)}</tr>
+        </tbody>
+      </table>
+      <p className="note">El escenario activo usa tus ajustes; los otros, sus valores por defecto.</p>
+    </details>
   )
 }
 
